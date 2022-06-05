@@ -75,6 +75,4 @@ update_animations :: proc(using s : ^Server) {
             configure_geometry_discard(s, wid, geometry)
         }
     }
-
-    xcb.flush(conn)
 }

@@ -45,7 +45,7 @@ Cell :: struct {
 }
 
 // Settings
-CELLS_COLUMNS :: []f32{4, 4}
+CELLS_COLUMNS :: []f32{4, 3}
 CELLS_ROWS :: []f32{1, 1, 1}
 CELLS_DIRECTION :: ScrollDirection.VERTICAL
 

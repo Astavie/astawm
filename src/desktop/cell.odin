@@ -67,23 +67,22 @@ cell_geometry :: proc(vd : VirtualDesktop, bounds : Cell, border_width : u16) ->
     columns := u16(len(vd.columns))
     rows    := u16(len(vd.rows))
 
-    // Screen number
-    xdis, ydis := view_distance(vd)
-
-    screen_x, inner_x := divmod(bounds.x, columns)
-    screen_y, inner_y := divmod(bounds.y, rows)
-
-    // Position of window
     total_x : f32 = 0
     total_y : f32 = 0
     for column in vd.columns do total_x += column
     for row    in vd.rows    do total_y += row
 
+    // Screen number
+    screen_x, inner_x := divmod(bounds.x, columns)
+    screen_y, inner_y := divmod(bounds.y, rows)
+
+    // Position of window
     partial_x : f32 = 0
     partial_y : f32 = 0
     for column in vd.columns[:inner_x] do partial_x += column
     for row    in vd.rows   [:inner_y] do partial_y += row
 
+    xdis, ydis := view_distance(vd)
     x := i16(partial_x / total_x * f32(xdis)) + screen_x * i16(xdis) + i16(vd.padding.left)
     y := i16(partial_y / total_y * f32(ydis)) + screen_y * i16(ydis) + i16(vd.padding.top)
 

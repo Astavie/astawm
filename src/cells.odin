@@ -139,6 +139,7 @@ cells :: proc(using s : ^server.Server, ctx : ^xcb_errors.Context) -> Maybe(erro
 animations :: proc(using s : ^server.Server, running : ^bool) {
     for running^ {
         server.update_animations(s)
+        xcb.flush(conn)
         time.accurate_sleep(time.Second / 60)
     }
 }
