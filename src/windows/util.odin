@@ -76,3 +76,16 @@ resize_checked :: proc(using s : ^server.Server, wid : xcb.Window, left, top, ri
 
     return nil
 }
+
+// Animate window moving
+start_animation :: proc(using s : ^server.Server, to : Geometry, frames : int, wid : xcb.Window) {
+    m := get_geometry_unchecked(s, wid)
+    if m == nil do return
+
+    animations[wid] = server.Animation {
+        from = m.?,
+        to = to,
+        frames = frames,
+        current_frame = 0,
+    }
+}

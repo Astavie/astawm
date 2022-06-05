@@ -8,13 +8,7 @@ import "../server"
 import "core:c/libc"
 import "core:strings"
 
-Geometry :: struct {
-    x : i16,
-    y : i16,
-    width : u16,
-    height : u16,
-    border_width : u16,
-}
+Geometry :: server.Geometry
 
 // Get the geometry of a window
 get_geometry :: proc(using s : ^server.Server, wid : xcb.Window) -> (g : Geometry, merr : Maybe(errors.X11Error)) {

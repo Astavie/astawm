@@ -8,12 +8,19 @@ Server :: struct {
     conn : ^xcb.Connection,
     screen : ^xcb.Screen,
 
+    // Animation info
+
+    animations : map[xcb.Window]Animation,
+
+    // ATOMS
+
     _NET_WM_NAME : xcb.Atom,
 }
 
 // Connect to the X server
 connect :: proc() -> (^Server, bool) {
     using s := new(Server)
+    animations = make(map[xcb.Window]Animation)
 
     screen_index : i32 = ---
     conn = xcb.connect(nil, &screen_index)
@@ -32,5 +39,6 @@ connect :: proc() -> (^Server, bool) {
 // Disconnect from the X server
 disconnect :: proc(using s : ^Server) {
     xcb.disconnect(conn)
+    delete(animations)
     free(s)
 }

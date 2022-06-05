@@ -23,7 +23,7 @@ cells :: proc(using s : ^server.Server, ctx : ^xcb_errors.Context) -> Maybe(erro
     windows.gain_control(s, screen.root) or_return
 
     // Create virtual desktop
-    vd := desktop.make(s, windows.Geometry {
+    vd := desktop.make(windows.Geometry {
         x = 0,
         y = 0,
         width = screen.width_in_pixels,
@@ -31,14 +31,14 @@ cells :: proc(using s : ^server.Server, ctx : ^xcb_errors.Context) -> Maybe(erro
         border_width = 0,
     }) or_return
 
-    defer desktop.delete(s, vd)
+    defer desktop.delete(vd)
 
     // Get all top-level windows
     children := windows.get_children(s, screen.root) or_return
 
     for child in children {
         // Place window within the virtual desktop
-        if child == vd.viewport || !windows.can_manipulate(s, child) or_return do continue
+        if !windows.can_manipulate(s, child) or_return do continue
 
         // TODO: check if window should be tiled or should stay floating
         errors.print_maybe(
@@ -126,11 +126,8 @@ cells :: proc(using s : ^server.Server, ctx : ^xcb_errors.Context) -> Maybe(erro
             case xcb.UNMAP_NOTIFY:
                 umn := cast(^xcb.UnmapNotifyEvent) event
 
-                // Ignore if triggered by reparenting
-                if umn.event == screen.root do break
-
                 // Remove window from virtual desktop
-                desktop.remove_window(s, &vd, umn.window)
+                desktop.remove_window(&vd, umn.window)
                 xcb.flush(conn)
         }
     }
@@ -141,6 +138,7 @@ cells :: proc(using s : ^server.Server, ctx : ^xcb_errors.Context) -> Maybe(erro
 // Animations thread
 animations :: proc(using s : ^server.Server, running : ^bool) {
     for running^ {
+        server.update_animations(s)
         time.accurate_sleep(time.Second / 60)
     }
 }
