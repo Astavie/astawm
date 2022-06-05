@@ -2,12 +2,13 @@ package windows
 
 import "../vendor/xcb"
 import "../errors"
+import "../server"
 
 import "core:c/libc"
 import "core:mem"
 
 // Checks if this window manager should be able to manipulate a specific window
-can_manipulate :: proc(conn : ^xcb.Connection, wid : xcb.Window) -> (b : bool, merr : Maybe(errors.X11Error)) {
+can_manipulate :: proc(using s : ^server.Server, wid : xcb.Window) -> (b : bool, merr : Maybe(errors.X11Error)) {
     cookie := xcb.get_window_attributes(conn, wid)
 
     err : ^xcb.GenericError = ---
@@ -20,16 +21,16 @@ can_manipulate :: proc(conn : ^xcb.Connection, wid : xcb.Window) -> (b : bool, m
 }
 
 // Gain control of a window
-gain_control :: proc(conn : ^xcb.Connection, wid : xcb.Window) -> Maybe(errors.X11Error) {
+gain_control :: proc(using s : ^server.Server, wid : xcb.Window) -> Maybe(errors.X11Error) {
     mask := xcb.EVENT_MASK_SUBSTRUCTURE_REDIRECT | xcb.EVENT_MASK_SUBSTRUCTURE_NOTIFY
     cookie := xcb.change_window_attributes_checked(conn, wid, xcb.CW_EVENT_MASK, &mask)
 
-    errors.check_cookie(conn, cookie, "Could not gain control of window %d\n", wid) or_return
+    errors.check_cookie(s, cookie, "Could not gain control of window %d\n", wid) or_return
     return nil
 }
 
 // Get children of window
-get_children :: proc(conn : ^xcb.Connection, wid : xcb.Window, alloc := context.allocator) -> (w : []xcb.Window, e : Maybe(errors.X11Error)) {
+get_children :: proc(using s : ^server.Server, wid : xcb.Window, alloc := context.allocator) -> (w : []xcb.Window, e : Maybe(errors.X11Error)) {
     cookie := xcb.query_tree(conn, wid)
     
     err : ^xcb.GenericError = ---
@@ -46,8 +47,8 @@ get_children :: proc(conn : ^xcb.Connection, wid : xcb.Window, alloc := context.
 }
 
 // Move window
-move_unchecked :: proc(conn : ^xcb.Connection, wid : xcb.Window, x, y : i16) {
-    geometry_maybe := get_geometry_unchecked(conn, wid)
+move_unchecked :: proc(using s : ^server.Server, wid : xcb.Window, x, y : i16) {
+    geometry_maybe := get_geometry_unchecked(s, wid)
     if geometry_maybe == nil do return
 
     geometry := geometry_maybe.?
@@ -59,11 +60,11 @@ move_unchecked :: proc(conn : ^xcb.Connection, wid : xcb.Window, x, y : i16) {
 }
 
 // Resize window
-resize_checked :: proc(conn : ^xcb.Connection, wid : xcb.Window, left, top, right, bottom : i16) -> Maybe(errors.X11Error) {
-    geometry := get_geometry(conn, wid) or_return
+resize_checked :: proc(using s : ^server.Server, wid : xcb.Window, left, top, right, bottom : i16) -> Maybe(errors.X11Error) {
+    geometry := get_geometry(s, wid) or_return
 
     errors.check_cookie(
-        conn,
+        s,
         xcb.configure_window_checked(conn, wid, xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y | xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT, &[4]u32{
             transmute(u32) i32(geometry.x - left),
             transmute(u32) i32(geometry.y - top),

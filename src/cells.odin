@@ -6,22 +6,24 @@ import "errors"
 import "atoms"
 import "windows"
 import "desktop"
+import "server"
 
 import "core:fmt"
 import "core:c/libc"
 import "core:slice"
+import "core:thread"
+import "core:time"
 
 // Main loop
-cells :: proc(conn : ^xcb.Connection, ctx : ^xcb_errors.Context) -> Maybe(errors.X11Error) {
+cells :: proc(using s : ^server.Server, ctx : ^xcb_errors.Context) -> Maybe(errors.X11Error) {
     // Get atoms
-    atoms.init(conn) or_return
+    atoms.init(s) or_return
 
     // Get screen
-    screen := xcb.setup_roots_iterator(xcb.get_setup(conn)).data
-    windows.gain_control(conn, screen.root) or_return
+    windows.gain_control(s, screen.root) or_return
 
     // Create virtual desktop
-    vd := desktop.make(conn, screen, windows.Geometry {
+    vd := desktop.make(s, windows.Geometry {
         x = 0,
         y = 0,
         width = screen.width_in_pixels,
@@ -29,19 +31,19 @@ cells :: proc(conn : ^xcb.Connection, ctx : ^xcb_errors.Context) -> Maybe(errors
         border_width = 0,
     }) or_return
 
-    defer desktop.delete(conn, vd)
+    defer desktop.delete(s, vd)
 
     // Get all top-level windows
-    children := windows.get_children(conn, screen.root) or_return
+    children := windows.get_children(s, screen.root) or_return
 
     for child in children {
         // Place window within the virtual desktop
-        if child == vd.viewport || !windows.can_manipulate(conn, child) or_return do continue
+        if child == vd.viewport || !windows.can_manipulate(s, child) or_return do continue
 
         // TODO: check if window should be tiled or should stay floating
         errors.print_maybe(
             ctx,
-            desktop.grid_place_window(conn, &vd, child, 1, 1),
+            desktop.grid_place_window(s, &vd, child, 1, 1),
         )
     }
 
@@ -76,7 +78,7 @@ cells :: proc(conn : ^xcb.Connection, ctx : ^xcb_errors.Context) -> Maybe(errors
                 mre := cast(^xcb.MapRequestEvent) event
                 errors.print_maybe(
                     ctx,
-                    desktop.grid_place_window(conn, &vd, mre.window, 1, 1),
+                    desktop.grid_place_window(s, &vd, mre.window, 1, 1),
                 )
                 xcb.map_window(conn, mre.window)
                 xcb.flush(conn)
@@ -128,7 +130,7 @@ cells :: proc(conn : ^xcb.Connection, ctx : ^xcb_errors.Context) -> Maybe(errors
                 if umn.event == screen.root do break
 
                 // Remove window from virtual desktop
-                desktop.remove_window(conn, screen, &vd, umn.window)
+                desktop.remove_window(s, &vd, umn.window)
                 xcb.flush(conn)
         }
     }
@@ -136,35 +138,35 @@ cells :: proc(conn : ^xcb.Connection, ctx : ^xcb_errors.Context) -> Maybe(errors
     return nil
 }
 
-// Connect to the X server
-connect :: proc() -> (^xcb.Connection, bool) {
-    screen_index : i32 = ---
-    conn := xcb.connect(nil, &screen_index)
-
-    if conn == nil || xcb.connection_has_error(conn) != 0 {
-        xcb.disconnect(conn)
-        fmt.print("Could not connect to the X server\n")
-        return ---, false
+// Animations thread
+animations :: proc(using s : ^server.Server, running : ^bool) {
+    for running^ {
+        time.accurate_sleep(time.Second / 60)
     }
-
-    return conn, true
 }
 
 // Main function
 main :: proc() {
     // Connect to the X server
-    conn, ok := connect()
+    s, ok := server.connect()
     if !ok do return
-    defer xcb.disconnect(conn)
+    defer server.disconnect(s)
 
     // Create xcb error context
     ctx : ^xcb_errors.Context = ---
-    _ = xcb_errors.context_new(conn, &ctx)
+    _ = xcb_errors.context_new(s.conn, &ctx)
     defer xcb_errors.context_free(ctx)
 
     // Run
+    running := true
+
+    t := thread.create_and_start_with_poly_data2(s, &running, animations)
+
     errors.print_maybe(
         ctx,
-        cells(conn, ctx),
+        cells(s, ctx),
     )
+
+    running = false
+    thread.join(t)
 }

@@ -3,10 +3,11 @@ package desktop
 import "../vendor/xcb"
 import "../errors"
 import "../windows"
+import "../server"
 
 // Place a new window opened by the user in the grid
-grid_place_window :: proc(conn : ^xcb.Connection, vd : ^VirtualDesktop, wid : xcb.Window, width, height : u16) -> Maybe(errors.X11Error) {
-    vd_geometry := windows.get_geometry(conn, vd.desktop) or_return
+grid_place_window :: proc(using s : ^server.Server, vd : ^VirtualDesktop, wid : xcb.Window, width, height : u16) -> Maybe(errors.X11Error) {
+    vd_geometry := windows.get_geometry(s, vd.desktop) or_return
 
     start_x, start_y := cell_at(
         vd^,
@@ -24,15 +25,15 @@ grid_place_window :: proc(conn : ^xcb.Connection, vd : ^VirtualDesktop, wid : xc
     // // Test code
     // if len(vd.grid_windows) == 0 do bounds.height = 2
 
-    prepared := grid_prepare_placement(conn, vd, wid, bounds) or_return
+    prepared := grid_prepare_placement(s, vd, wid, bounds) or_return
 
-    cell_place_window(conn, vd, wid, prepared)
+    cell_place_window(s, vd, wid, prepared)
 
     return nil
 }
 
 // Resizes the desktop to fit the cell if needed
-grid_prepare_placement :: proc(conn : ^xcb.Connection, vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) -> (b : Cell, e : Maybe(errors.X11Error)) {
+grid_prepare_placement :: proc(using s : ^server.Server, vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) -> (b : Cell, e : Maybe(errors.X11Error)) {
     b = bounds
 
     if vd.scroll == .NONE do return
@@ -54,7 +55,7 @@ grid_prepare_placement :: proc(conn : ^xcb.Connection, vd : ^VirtualDesktop, wid
     if left == 0 && right == 0 && top == 0 && bottom == 0 do return
 
     // Resize
-    resize(conn, vd, left, top, right, bottom) or_return
+    resize(s, vd, left, top, right, bottom) or_return
     b.x = u16(i16(b.x) + left * i16(len(vd.columns)))
     b.y = u16(i16(b.y) + top  * i16(len(vd.rows)))
     return

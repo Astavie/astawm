@@ -3,6 +3,7 @@ package windows
 import "../vendor/xcb"
 import "../errors"
 import "../atoms"
+import "../server"
 
 import "core:c/libc"
 import "core:strings"
@@ -16,7 +17,7 @@ Geometry :: struct {
 }
 
 // Get the geometry of a window
-get_geometry :: proc(conn : ^xcb.Connection, wid : xcb.Window) -> (g : Geometry, merr : Maybe(errors.X11Error)) {
+get_geometry :: proc(using s : ^server.Server, wid : xcb.Window) -> (g : Geometry, merr : Maybe(errors.X11Error)) {
     cookie := xcb.get_geometry(conn, wid)
     err : ^xcb.GenericError = ---
     reply := xcb.get_geometry_reply(conn, cookie, &err)
@@ -34,7 +35,7 @@ get_geometry :: proc(conn : ^xcb.Connection, wid : xcb.Window) -> (g : Geometry,
 }
 
 // Get the geometry of a window, sending any potential errors to the event loop
-get_geometry_unchecked :: proc(conn : ^xcb.Connection, wid : xcb.Window) -> Maybe(Geometry) {
+get_geometry_unchecked :: proc(using s : ^server.Server, wid : xcb.Window) -> Maybe(Geometry) {
     cookie := xcb.get_geometry_unchecked(conn, wid)
     reply := xcb.get_geometry_reply(conn, cookie, nil)
 
@@ -52,13 +53,13 @@ get_geometry_unchecked :: proc(conn : ^xcb.Connection, wid : xcb.Window) -> Mayb
 }
 
 // Get window title
-get_title :: proc(conn : ^xcb.Connection, wid : xcb.Window, alloc := context.allocator) -> (s : string, e : Maybe(errors.X11Error)) {
+get_title :: proc(using s : ^server.Server, wid : xcb.Window, alloc := context.allocator) -> (str : string, e : Maybe(errors.X11Error)) {
     // EWWH name
-    reply := atoms.get_value(conn, atoms._NET_WM_NAME, wid) or_return
+    reply := atoms.get_value(s, _NET_WM_NAME, wid) or_return
     if (xcb.get_property_value_length(reply) == 0) {
         // ICCCM name
         libc.free(reply)
-        reply = atoms.get_value(conn, xcb.ATOM_WM_NAME, wid) or_return
+        reply = atoms.get_value(s, xcb.ATOM_WM_NAME, wid) or_return
     }
 
     defer libc.free(reply)

@@ -3,6 +3,7 @@ package desktop
 import "../vendor/xcb"
 import "../errors"
 import "../windows"
+import "../server"
 
 import "core:builtin"
 import "core:slice"
@@ -62,12 +63,12 @@ CELLS_PADDING :: Padding {
 }
 
 // Create virtual desktop
-make :: proc(conn : ^xcb.Connection, screen : ^xcb.Screen, geometry : windows.Geometry) -> (vd : VirtualDesktop, e : Maybe(errors.X11Error)) {
+make :: proc(using s : ^server.Server, geometry : windows.Geometry) -> (vd : VirtualDesktop, e : Maybe(errors.X11Error)) {
     // create viewport
     viewport := xcb.generate_id(conn)
 
     errors.check_cookie(
-        conn,
+        s,
         xcb.create_window_checked(
             conn, screen.root_depth, viewport, screen.root,
             geometry.x, geometry.y, geometry.width, geometry.height, geometry.border_width,
@@ -77,7 +78,7 @@ make :: proc(conn : ^xcb.Connection, screen : ^xcb.Screen, geometry : windows.Ge
     ) or_return
 
     errors.check_cookie(
-        conn,
+        s,
         xcb.map_window_checked(conn, viewport),
         "Could not map viewport window to screen\n",
     ) or_return
@@ -88,7 +89,7 @@ make :: proc(conn : ^xcb.Connection, screen : ^xcb.Screen, geometry : windows.Ge
     values := xcb.EVENT_MASK_SUBSTRUCTURE_REDIRECT | xcb.EVENT_MASK_SUBSTRUCTURE_NOTIFY
 
     errors.check_cookie(
-        conn,
+        s,
         xcb.create_window_checked(
             conn, screen.root_depth, desktop, viewport,
             0, 0, geometry.width, geometry.height, 0,
@@ -98,7 +99,7 @@ make :: proc(conn : ^xcb.Connection, screen : ^xcb.Screen, geometry : windows.Ge
     ) or_return
 
     errors.check_cookie(
-        conn,
+        s,
         xcb.map_window_checked(conn, desktop),
         "Could not map virtual desktop window to screen\n",
     ) or_return
@@ -126,7 +127,7 @@ make :: proc(conn : ^xcb.Connection, screen : ^xcb.Screen, geometry : windows.Ge
 }
 
 // Delete desktop
-delete :: proc(conn : ^xcb.Connection, vd : VirtualDesktop) {
+delete :: proc(using s : ^server.Server, vd : VirtualDesktop) {
     builtin.delete(vd.grid_windows)
     builtin.delete(vd.floating_windows)
 
@@ -139,7 +140,7 @@ delete :: proc(conn : ^xcb.Connection, vd : VirtualDesktop) {
 
 // Removes a window from the virtual desktop
 // TODO: possibly shrink
-remove_window :: proc(conn : ^xcb.Connection, screen : ^xcb.Screen, vd : ^VirtualDesktop, wid : xcb.Window) {
+remove_window :: proc(using s : ^server.Server, vd : ^VirtualDesktop, wid : xcb.Window) {
     // Remove window from being tracked
     if !(wid in vd.grid_windows) {
         if !(wid in vd.floating_windows) do return
@@ -170,7 +171,7 @@ scrolls_vertical :: proc(scroll : ScrollDirection) -> bool {
 }
 
 // Resizes the virtual desktop
-resize :: proc(conn : ^xcb.Connection, vd : ^VirtualDesktop, left, top, right, bottom : i16) -> Maybe(errors.X11Error) {
+resize :: proc(using s : ^server.Server, vd : ^VirtualDesktop, left, top, right, bottom : i16) -> Maybe(errors.X11Error) {
     xdis, ydis := view_distance(vd^)
 
     left_px   := left   * i16(xdis)
@@ -190,9 +191,9 @@ resize :: proc(conn : ^xcb.Connection, vd : ^VirtualDesktop, left, top, right, b
         }
 
         // Move all windows (left, top)
-        children := windows.get_children(conn, vd.desktop) or_return
+        children := windows.get_children(s, vd.desktop) or_return
 
-        for wid in children do windows.move_unchecked(conn, wid, left_px, top_px)
+        for wid in children do windows.move_unchecked(s, wid, left_px, top_px)
 
         builtin.delete(children)
     }
@@ -201,7 +202,7 @@ resize :: proc(conn : ^xcb.Connection, vd : ^VirtualDesktop, left, top, right, b
     vd.views_horiz = u16(i16(vd.views_horiz) + left + right)
     vd.views_vert  = u16(i16(vd.views_vert)  + top  + bottom)
 
-    windows.resize_checked(conn, vd.desktop, left_px, top_px, right_px, bottom_px) or_return
+    windows.resize_checked(s, vd.desktop, left_px, top_px, right_px, bottom_px) or_return
 
     return nil
 }
