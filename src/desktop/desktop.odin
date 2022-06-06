@@ -19,8 +19,11 @@ VirtualDesktop :: struct {
     gap : u16,
     padding : Padding,
 
-    columns : []f32,
-    rows : []f32,
+    default_columns : []f32,
+    default_rows : []f32,
+    custom_columns : map[i16]f32,
+    custom_rows : map[i16]f32,
+
     scroll : ScrollDirection,
     scroll_x : i16,
     scroll_y : i16,
@@ -44,9 +47,8 @@ Cell :: struct {
 }
 
 // Settings
-// TODO: don't enforce repetition in the scrolling direction
-CELLS_COLUMNS :: []f32{4, 3}
-CELLS_ROWS :: []f32{1, 1, 1}
+CELLS_COLUMNS :: []f32{ 4.0 / 7, 3.0 / 7 }
+CELLS_ROWS :: []f32{ 1.0 / 3 }
 CELLS_DIRECTION :: ScrollDirection.VERTICAL
 
 CELLS_GAP :: 8
@@ -66,8 +68,11 @@ new :: proc(geometry : windows.Geometry) -> (vd : ^VirtualDesktop, e : Maybe(err
     vd.gap = CELLS_GAP
     vd.padding = CELLS_PADDING
     
-    vd.columns = slice.clone(CELLS_COLUMNS)
-    vd.rows = slice.clone(CELLS_ROWS)
+    vd.default_columns = slice.clone(CELLS_COLUMNS)
+    vd.default_rows = slice.clone(CELLS_ROWS)
+    vd.custom_columns = make(map[i16]f32)
+    vd.custom_rows = make(map[i16]f32)
+
     vd.scroll = CELLS_DIRECTION
 
     vd.grid_windows     = make(map[xcb.Window]Cell)
@@ -81,8 +86,10 @@ free :: proc(vd : ^VirtualDesktop) {
     delete(vd.grid_windows)
     delete(vd.floating_windows)
 
-    delete(vd.columns)
-    delete(vd.rows)
+    delete(vd.default_columns)
+    delete(vd.default_rows)
+    delete(vd.custom_columns)
+    delete(vd.custom_rows)
 
     builtin.free(vd)
 }
@@ -96,13 +103,6 @@ remove_window :: proc(vd : ^VirtualDesktop, wid : xcb.Window) {
 // Checks if this desktop is tracking this window
 has_window :: proc(vd : ^VirtualDesktop, wid : xcb.Window) -> bool {
     return wid in vd.floating_windows || wid in vd.grid_windows
-}
-
-// Get distance between screens
-view_distance :: proc(vd : ^VirtualDesktop) -> (u16, u16) {
-    xdis := vd.viewport.width  - vd.padding.left - vd.padding.right  + vd.gap
-    ydis := vd.viewport.height - vd.padding.top  - vd.padding.bottom + vd.gap
-    return xdis, ydis
 }
 
 // Get all windows

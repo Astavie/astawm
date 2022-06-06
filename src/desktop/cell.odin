@@ -5,6 +5,8 @@ import "../wm/errors"
 import "../windows"
 import "../wm"
 
+import "core:fmt"
+
 // Checks if a rectangle is free of any windows
 cell_is_free :: proc(vd : ^VirtualDesktop, rect : Cell, ignore : xcb.Window = xcb.WINDOW_NONE) -> bool {
     for wid, bounds in vd.grid_windows {
@@ -16,107 +18,114 @@ cell_is_free :: proc(vd : ^VirtualDesktop, rect : Cell, ignore : xcb.Window = xc
     return true
 }
 
-@(private)
-divmod :: proc(a : i16, b : u16) -> (div : i16, mod : i16) {
-    div = a / i16(b)
-    mod = a % i16(b)
-    if mod < 0 {
-        div -= 1
-        mod += i16(b)
+column_size :: proc(vd : ^VirtualDesktop, column : i16) -> u16 {
+    factor : f32 = 1
+
+    if custom, ok := vd.custom_columns[column]; ok {
+        factor = custom
+    } else if (len(vd.default_columns) > 0) {
+        mod := column % i16(len(vd.default_columns))
+        if mod < 0 do mod += i16(len(vd.default_columns))
+        factor = vd.default_columns[mod]
     }
-    return
+
+    vp := f32(vd.viewport.width - vd.padding.left - vd.padding.right)
+    gap := (1 - factor) * f32(vd.gap)
+    size := vp * factor - gap
+
+    return u16(size)
 }
 
-// Get cell at viewport position (px, py)
+row_size :: proc(vd : ^VirtualDesktop, row : i16) -> u16 {
+    factor : f32 = 1
+
+    if custom, ok := vd.custom_rows[row]; ok {
+        factor = custom
+    } else if (len(vd.default_rows) > 0) {
+        mod := row % i16(len(vd.default_rows))
+        if mod < 0 do mod += i16(len(vd.default_rows))
+        factor = vd.default_rows[mod]
+    }
+
+    vp := f32(vd.viewport.height - vd.padding.top - vd.padding.bottom)
+    gap := (1 - factor) * f32(vd.gap)
+    size := vp * factor - gap
+
+    return u16(size)
+}
+
+// Get cell at internal position
 cell_at :: proc(vd : ^VirtualDesktop, px, py : i16) -> (i16, i16) {
-    // Get screen number and pixels within screen
-    xdis, ydis := view_distance(vd)
-
-    screen_x, inner_x := divmod(px - i16(vd.padding.left) + vd.scroll_x, xdis)
-    screen_y, inner_y := divmod(py - i16(vd.padding.top)  + vd.scroll_y, ydis)
-
-    // Get cell within screen
-    total_x : f32 = 0
-    total_y : f32 = 0
-    for column in vd.columns do total_x += column
-    for row    in vd.rows    do total_y += row
+    prev_px : i16 = 0
+    prev_py : i16 = 0
 
     cell_x : i16 = 0
     cell_y : i16 = 0
 
-    for partial_x : f32 = 0; cell_x < i16(len(vd.columns)); cell_x += 1 {
-        partial_x += vd.columns[cell_x]
-        if partial_x / total_x * f32(xdis) > f32(inner_x) do break
+    if px >= 0 do for {
+        next := i16(vd.gap + column_size(vd, cell_x))
+        if prev_px + next > px do break
+
+        prev_px += next
+        cell_x += 1
+    } else do for {
+        next := i16(vd.gap + column_size(vd, cell_x - 1))
+        if prev_px - next < px do break
+
+        prev_px -= next
+        cell_x -= 1
     }
 
-    for partial_y : f32 = 0; cell_y < i16(len(vd.rows)); cell_y += 1 {
-        partial_y += vd.rows[cell_y]
-        if partial_y / total_y * f32(ydis) > f32(inner_y) do break
-    }
+    if py >= 0 do for {
+        next := i16(vd.gap + row_size(vd, cell_y))
+        if prev_py + next > py do break
 
-    // Return cell in screen
-    cell_x += screen_x * i16(len(vd.columns))
-    cell_y += screen_y * i16(len(vd.rows))
+        prev_py += next
+        cell_y += 1
+    } else do for {
+        next := i16(vd.gap + row_size(vd, cell_y - 1))
+        if prev_py - next < py do break
+
+        prev_py -= next
+        cell_y -= 1
+    }
 
     return cell_x, cell_y
 }
 
-// Get position and size in pixels of cell rectangle
-// TODO: comply with window size requests
-cell_geometry :: proc(vd : ^VirtualDesktop, bounds : Cell, border_width : u16) -> windows.Geometry {
-    columns := u16(len(vd.columns))
-    rows    := u16(len(vd.rows))
-
-    total_x : f32 = 0
-    total_y : f32 = 0
-    for column in vd.columns do total_x += column
-    for row    in vd.rows    do total_y += row
-
-    // Screen number
-    screen_x, inner_x := divmod(bounds.x, columns)
-    screen_y, inner_y := divmod(bounds.y, rows)
-
+// Get position and size in pixels of cell rectangle with internal coordinates
+cell_geometry :: proc(vd : ^VirtualDesktop, bounds : Cell) -> windows.Geometry {
     // Position of window
-    partial_x : f32 = 0
-    partial_y : f32 = 0
-    for column in vd.columns[:inner_x] do partial_x += column
-    for row    in vd.rows   [:inner_y] do partial_y += row
+    x, y : i16
 
-    xdis, ydis := view_distance(vd)
-    x := i16(partial_x / total_x * f32(xdis)) + screen_x * i16(xdis) + i16(vd.padding.left)
-    y := i16(partial_y / total_y * f32(ydis)) + screen_y * i16(ydis) + i16(vd.padding.top)
+    if bounds.x >= 0 do for i in 0 ..<  bounds.x do x += i16(column_size(vd,  i) + vd.gap)
+    else             do for i in 1 ..= -bounds.x do x -= i16(column_size(vd, -i) + vd.gap)
+    if bounds.y >= 0 do for i in 0 ..<  bounds.y do y += i16(   row_size(vd,  i) + vd.gap)
+    else             do for i in 1 ..= -bounds.y do y -= i16(   row_size(vd, -i) + vd.gap)
 
     // Size of window
-    size_partial_x : f32 = 0
-    size_partial_y : f32 = 0
+    width, height : u16
 
-    for i in bounds.x ..< bounds.x + i16(bounds.width) {
-        _, idx := divmod(i, columns)
-        size_partial_x += vd.columns[idx]
-    }
-    for i in bounds.y ..< bounds.y + i16(bounds.height) {
-        _, idx := divmod(i, rows)
-        size_partial_y += vd.rows[idx]
-    }
-
-    width  := u16(size_partial_x / total_x * f32(xdis)) - vd.gap - 2 * border_width
-    height := u16(size_partial_y / total_y * f32(ydis)) - vd.gap - 2 * border_width
+    for i in 0 ..< bounds.width  do width  += column_size(vd, bounds.x + i16(i)) + vd.gap
+    for i in 0 ..< bounds.height do height +=    row_size(vd, bounds.y + i16(i)) + vd.gap
 
     // Return
     return windows.Geometry {
-        x = x - vd.scroll_x + vd.viewport.x,
-        y = y - vd.scroll_y + vd.viewport.y,
-        width = width,
-        height = height,
-        border_width = border_width,
+        x = x,
+        y = y,
+        width  = width  - vd.gap,
+        height = height - vd.gap,
     }
 }
 
 // Places a window within the grid of the virtual desktop
 cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) -> Maybe(errors.X11Error) {
     // Geometry of window
+    // TODO respect window size requests
     border_width := (windows.get_geometry(s, wid) or_return).border_width
-    geometry := cell_geometry(vd, bounds, border_width)
+    geometry     := cell_geometry(vd, bounds)
+    geometry.x   += -vd.scroll_x + vd.viewport.x + i16(vd.padding.left)
+    geometry.y   += -vd.scroll_y + vd.viewport.y + i16(vd.padding.top)
 
     // Place window in virtual desktop
     if !has_window(vd, wid) {
@@ -127,8 +136,8 @@ cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
             conn, wid,
             xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y | xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT | xcb.CONFIG_WINDOW_BORDER_WIDTH,
             &[5]u32{
-                transmute(u32) i32(geometry.x + i16((geometry.width - 1) / 2)  - i16(geometry.border_width)),
-                transmute(u32) i32(geometry.y + i16((geometry.height - 1) / 2) - i16(geometry.border_width)),
+                transmute(u32) i32(geometry.x + i16(geometry.width  / 2) - i16(geometry.border_width)),
+                transmute(u32) i32(geometry.y + i16(geometry.height / 2) - i16(geometry.border_width)),
                 u32(1),
                 u32(1),
                 u32(geometry.border_width),
@@ -137,6 +146,10 @@ cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
 
         errors.check_cookie(conn, cookie, "Error configuring window %d\n", wid) or_return
     }
+
+    geometry.width   -= 2 * border_width
+    geometry.height  -= 2 * border_width
+    geometry.border_width = border_width
 
     wm.animate_to(s, geometry, 15, 1, wid) or_return
 

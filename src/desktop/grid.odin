@@ -7,11 +7,7 @@ import "../wm"
 
 // Place a new window opened by the user in the grid
 grid_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid : xcb.Window, width, height : u16) -> Maybe(errors.X11Error) {
-    start_x, start_y := cell_at(
-        vd,
-        i16(vd.padding.left),
-        i16(vd.padding.top),
-    )
+    start_x, start_y := cell_at(vd, vd.scroll_x, vd.scroll_y)
 
     start := Cell {
         x = start_x,
@@ -38,40 +34,22 @@ grid_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
 
 // Scrolls the grid to a cell
 grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds : Cell) {
-    // Get target cell
-    current_x, current_y := cell_at(
-        vd,
-        i16(vd.padding.left),
-        i16(vd.padding.top),
-    )
+    // Get scroll target
+    view_w := i16(vd.viewport.width  - vd.padding.left - vd.padding.right)
+    view_h := i16(vd.viewport.height - vd.padding.top  - vd.padding.bottom)
 
-    columns := i16(len(vd.columns))
-    rows    := i16(len(vd.rows))
+    geometry := cell_geometry(vd, bounds)
 
-    cell_x, cell_y : i16
+    x := vd.scroll_x
+    y := vd.scroll_y
 
-    if bounds.x + i16(bounds.width)  > current_x + columns do cell_x = bounds.x + i16(bounds.width)  - columns
-    if bounds.x                      < current_x           do cell_x = bounds.x
-    if bounds.y + i16(bounds.height) > current_y + rows    do cell_y = bounds.y + i16(bounds.height) - rows
-    if bounds.y                      < current_y           do cell_y = bounds.y
+    if geometry.x + i16(geometry.width)  > x + view_w do x = geometry.x + i16(geometry.width)  - view_w
+    if geometry.y + i16(geometry.height) > y + view_h do y = geometry.y + i16(geometry.height) - view_h
 
-    // Get position of cell
-    total_x : f32 = 0
-    total_y : f32 = 0
-    for column in vd.columns do total_x += column
-    for row    in vd.rows    do total_y += row
+    if geometry.x < x do x = geometry.x
+    if geometry.y < y do y = geometry.y
 
-    screen_x, inner_x := divmod(cell_x, u16(columns))
-    screen_y, inner_y := divmod(cell_y, u16(rows))
-
-    partial_x : f32 = 0
-    partial_y : f32 = 0
-    for column in vd.columns[:inner_x] do partial_x += column
-    for row    in vd.rows   [:inner_y] do partial_y += row
-
-    xdis, ydis := view_distance(vd)
-    x := i16(partial_x / total_x * f32(xdis)) + screen_x * i16(xdis)
-    y := i16(partial_y / total_y * f32(ydis)) + screen_y * i16(ydis)
+    if x == vd.scroll_x && y == vd.scroll_y do return
 
     // Setup scrolling
     change := wm.GeometryChange {
@@ -106,22 +84,22 @@ grid_find_free_cell :: proc(vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cel
         // Increment if not
         switch (vd.scroll) {
             case .HORIZONTAL:
-                if y >= i16(len(vd.rows)) - i16(bounds.height) {
+                if y >= i16(len(vd.default_rows)) - i16(bounds.height) {
                     y = 0
                     x += 1
                 } else {
                     y += 1
                 }
             case .VERTICAL:
-                if x >= i16(len(vd.columns)) - i16(bounds.width) {
+                if x >= i16(len(vd.default_columns)) - i16(bounds.width) {
                     x = 0
                     y += 1
                 } else {
                     x += 1
                 }
             case .NONE:
-                if x >= i16(len(vd.columns)) - i16(bounds.width) {
-                    if y >= i16(len(vd.rows)) - i16(bounds.height) do break loop
+                if x >= i16(len(vd.default_columns)) - i16(bounds.width) {
+                    if y >= i16(len(vd.default_rows)) - i16(bounds.height) do break loop
                     x = 0
                     y += 1
                 } else {
