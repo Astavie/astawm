@@ -3,6 +3,7 @@ package server
 import "../vendor/xcb"
 
 import "core:fmt"
+import "core:sync"
 
 Server :: struct {
     conn : ^xcb.Connection,
@@ -10,6 +11,7 @@ Server :: struct {
 
     // Animation info
 
+    animation_mutex : sync.Recursive_Mutex,
     animations : map[xcb.Window]Animation,
 
     // ATOMS

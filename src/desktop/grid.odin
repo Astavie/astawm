@@ -9,8 +9,8 @@ import "../server"
 grid_place_window :: proc(using s : ^server.Server, vd : ^VirtualDesktop, wid : xcb.Window, width, height : u16) -> Maybe(errors.X11Error) {
     start_x, start_y := cell_at(
         vd^,
-        vd.scroll_x + i16(vd.padding.left),
-        vd.scroll_y + i16(vd.padding.top),
+        i16(vd.padding.left),
+        i16(vd.padding.top),
     )
 
     start := Cell {

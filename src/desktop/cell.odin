@@ -27,13 +27,13 @@ divmod :: proc(a : i16, b : u16) -> (div : i16, mod : i16) {
     return
 }
 
-// Get cell at position (px, py)
+// Get cell at viewport position (px, py)
 cell_at :: proc(vd : VirtualDesktop, px, py : i16) -> (i16, i16) {
     // Get screen number and pixels within screen
     xdis, ydis := view_distance(vd)
 
-    screen_x, inner_x := divmod(px - i16(vd.padding.left), xdis)
-    screen_y, inner_y := divmod(py - i16(vd.padding.top),  ydis)
+    screen_x, inner_x := divmod(px - i16(vd.padding.left) + vd.scroll_x, xdis)
+    screen_y, inner_y := divmod(py - i16(vd.padding.top)  + vd.scroll_y, ydis)
 
     // Get cell within screen
     total_x : f32 = 0
@@ -121,8 +121,22 @@ cell_place_window :: proc(using s : ^server.Server, vd : ^VirtualDesktop, wid : 
     geometry := cell_geometry(vd^, bounds, geometry_maybe.?.border_width)
 
     // Place window in virtual desktop
-    windows.start_animation(s, geometry, 15, wid)
+    if !has_window(vd, wid) {
+        // Start from center of geometry
+        // TODO resizing while mapped costs a lot of time
+        center := windows.Geometry {
+            x = geometry.x + i16((geometry.width - 1) / 2)  - i16(geometry.border_width),
+            y = geometry.y + i16((geometry.height - 1) / 2) - i16(geometry.border_width),
+            width = 1,
+            height = 1,
+            border_width = geometry.border_width,
+        }
 
-    delete_key(&vd.floating_windows, wid)
+        server.configure_geometry_discard(s, wid, center)
+    }
+
+    windows.start_animation(s, geometry, 15, 1, wid)
+
+    remove_window(vd, wid)
     vd.grid_windows[wid] = bounds
 }

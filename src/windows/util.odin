@@ -46,46 +46,20 @@ get_children :: proc(using s : ^server.Server, wid : xcb.Window, alloc := contex
     return mem.clone_slice(arr, alloc), nil
 }
 
-// Move window
-move_unchecked :: proc(using s : ^server.Server, wid : xcb.Window, x, y : i16) {
-    geometry_maybe := get_geometry_unchecked(s, wid)
-    if geometry_maybe == nil do return
-
-    geometry := geometry_maybe.?
-
-    xcb.configure_window(conn, wid, xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y, &[2]u32{
-        transmute(u32) i32(geometry.x + x),
-        transmute(u32) i32(geometry.y + y),
-    })
-}
-
-// Resize window
-resize_checked :: proc(using s : ^server.Server, wid : xcb.Window, left, top, right, bottom : i16) -> Maybe(errors.X11Error) {
-    geometry := get_geometry(s, wid) or_return
-
-    errors.check_cookie(
-        s,
-        xcb.configure_window_checked(conn, wid, xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y | xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT, &[4]u32{
-            transmute(u32) i32(geometry.x - left),
-            transmute(u32) i32(geometry.y - top),
-            u32(i16(geometry.width) + right + left),
-            u32(i16(geometry.height) + bottom + top),
-        }),
-        "Could not resize window %d\n", wid,
-    ) or_return
-
-    return nil
-}
-
 // Animate window moving
-start_animation :: proc(using s : ^server.Server, to : Geometry, frames : int, wid : xcb.Window) {
-    m := get_geometry_unchecked(s, wid)
-    if m == nil do return
+start_animation :: proc(using s : ^server.Server, to : Geometry, frames : int, bouce : f32, wid : xcb.Window) {
+    if server.guard_animations(s) {
 
-    animations[wid] = server.Animation {
-        from = m.?,
-        to = to,
-        frames = frames,
-        current_frame = 0,
+        m := get_geometry_unchecked(s, wid)
+        if m == nil do return
+
+        animations[wid] = server.Animation {
+            from = m.?,
+            to = to,
+            frames = frames,
+            current_frame = 0,
+            bounce = bouce,
+        }
+        
     }
 }

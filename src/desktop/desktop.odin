@@ -91,6 +91,11 @@ remove_window :: proc(vd : ^VirtualDesktop, wid : xcb.Window) {
     delete_key(&vd.grid_windows, wid)
 }
 
+// Checks if this desktop is tracking this window
+has_window :: proc(vd : ^VirtualDesktop, wid : xcb.Window) -> bool {
+    return wid in vd.floating_windows || wid in vd.grid_windows
+}
+
 // Get distance between screens
 view_distance :: proc(vd : VirtualDesktop) -> (u16, u16) {
     xdis := vd.viewport.width  - vd.padding.left - vd.padding.right  + vd.gap

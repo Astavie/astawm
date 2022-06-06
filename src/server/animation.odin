@@ -3,7 +3,7 @@ package server
 import "../vendor/xcb"
 
 import "core:slice"
-import "core:fmt"
+import "core:sync"
 
 Geometry :: struct {
     x : i16,
@@ -17,6 +17,21 @@ Animation :: struct {
     from, to : Geometry,
     frames : int,
     current_frame : int,
+    bounce : f32,
+}
+
+lock_animations :: proc(using s : ^Server) {
+    sync.recursive_mutex_lock(&animation_mutex)
+}
+
+unlock_animations :: proc(using s : ^Server) {
+    sync.recursive_mutex_unlock(&animation_mutex)
+}
+
+@(deferred_in=unlock_animations)
+guard_animations :: proc(using s : ^Server) -> bool {
+    lock_animations(s)
+    return true
 }
 
 configure_geometry_discard :: proc(using s : ^Server, wid : xcb.Window, geometry : Geometry) {
@@ -51,28 +66,34 @@ lerp_geometry :: proc(from, to : Geometry, f : f32) -> Geometry {
 }
 
 update_animations :: proc(using s : ^Server) {
-    keys := slice.map_keys(animations)
+    // Enter animations lock
+    if guard_animations(s) {
+        // Update scroll
+        // TODO
 
-    for wid in keys {
-        anim := &animations[wid]
+        // Update animations
+        keys := slice.map_keys(animations)
+        for wid in keys {
+            anim := &animations[wid]
 
-        anim.current_frame += 1
-        if anim.current_frame == anim.frames {
-            configure_geometry_discard(s, wid, anim.to)
-            delete_key(&animations, wid)
-        } else {
-            f := f32(anim.current_frame) / f32  (anim.frames)
+            anim.current_frame += 1
+            if anim.current_frame == anim.frames {
+                configure_geometry_discard(s, wid, anim.to)
+                delete_key(&animations, wid)
+            } else {
+                f := f32(anim.current_frame) / f32  (anim.frames)
 
-            // easeOutBack
-            c1 :: 1 // 1.70158
-            c3 :: c1 + 1
+                // easeOutBack
+                c1 := anim.bounce
+                c3 := c1 + 1
 
-            f -= 1
-            f = 1 + c3 * f * f * f + c1 * f * f
+                f -= 1
+                f = 1 + c3 * f * f * f + c1 * f * f
 
-            // configure
-            geometry := lerp_geometry(anim.from, anim.to, f)
-            configure_geometry_discard(s, wid, geometry)
+                // configure
+                geometry := lerp_geometry(anim.from, anim.to, f)
+                configure_geometry_discard(s, wid, geometry)
+            }
         }
     }
 }
