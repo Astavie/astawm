@@ -16,7 +16,7 @@ cell_is_free :: proc(vd : VirtualDesktop, rect : Cell, ignore : xcb.Window = xcb
     return true
 }
 
-@(private="file")
+@(private)
 divmod :: proc(a : i16, b : u16) -> (div : i16, mod : i16) {
     div = a / i16(b)
     mod = a % i16(b)
@@ -132,7 +132,7 @@ cell_place_window :: proc(using s : ^server.Server, vd : ^VirtualDesktop, wid : 
             border_width = geometry.border_width,
         }
 
-        server.configure_geometry_discard(s, wid, center)
+        server.configure_window_discard(s, wid, center)
     }
 
     windows.start_animation(s, geometry, 15, 1, wid)

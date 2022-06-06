@@ -45,6 +45,7 @@ Cell :: struct {
 }
 
 // Settings
+// TODO: don't enforce repetition in the scrolling direction
 CELLS_COLUMNS :: []f32{4, 3}
 CELLS_ROWS :: []f32{1, 1, 1}
 CELLS_DIRECTION :: ScrollDirection.VERTICAL
@@ -101,4 +102,12 @@ view_distance :: proc(vd : VirtualDesktop) -> (u16, u16) {
     xdis := vd.viewport.width  - vd.padding.left - vd.padding.right  + vd.gap
     ydis := vd.viewport.height - vd.padding.top  - vd.padding.bottom + vd.gap
     return xdis, ydis
+}
+
+// Get all windows
+get_windows :: proc(vd : VirtualDesktop) -> []xcb.Window {
+    return slice.concatenate([][]xcb.Window{
+        slice.map_keys(vd.floating_windows),
+        slice.map_keys(vd.grid_windows),
+    })
 }

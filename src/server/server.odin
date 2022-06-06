@@ -13,6 +13,7 @@ Server :: struct {
 
     animation_mutex : sync.Recursive_Mutex,
     animations : map[xcb.Window]Animation,
+    movements : map[xcb.Window]Movement,
 
     // ATOMS
 
