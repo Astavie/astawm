@@ -5,6 +5,8 @@ import "../wm/errors"
 import "../windows"
 import "../wm"
 
+import "core:fmt"
+
 // Checks if a rectangle is free of any windows
 cell_is_free :: proc(vd : ^VirtualDesktop, rect : Cell, ignore : xcb.Window = xcb.WINDOW_NONE) -> bool {
     for wid, bounds in vd.grid_windows {
@@ -27,7 +29,7 @@ column_size :: proc(vd : ^VirtualDesktop, column : i16) -> u16 {
         factor = vd.default_columns[mod]
     }
 
-    vp := f32(vd.viewport.width - vd.padding.left - vd.padding.right)
+    vp := f32(vd.width - vd.padding.left - vd.padding.right)
     gap := (1 - factor) * f32(vd.gap)
     size := vp * factor - gap
 
@@ -45,7 +47,7 @@ row_size :: proc(vd : ^VirtualDesktop, row : i16) -> u16 {
         factor = vd.default_rows[mod]
     }
 
-    vp := f32(vd.viewport.height - vd.padding.top - vd.padding.bottom)
+    vp := f32(vd.height - vd.padding.top - vd.padding.bottom)
     gap := (1 - factor) * f32(vd.gap)
     size := vp * factor - gap
 
@@ -122,27 +124,20 @@ cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
     // TODO respect window size requests
     border_width := (windows.get_geometry(s, wid) or_return).border_width
     geometry     := cell_geometry(vd, bounds)
-    geometry.x   += -vd.scroll_x + vd.viewport.x + i16(vd.padding.left)
-    geometry.y   += -vd.scroll_y + vd.viewport.y + i16(vd.padding.top)
+    geometry.x   += -vd.scroll_x + i16(vd.padding.left)
+    geometry.y   += -vd.scroll_y + i16(vd.padding.top)
 
     // Place window in virtual desktop
     if !has_window(vd, wid) {
         // Start from center of geometry
         // TODO resizing while mapped costs a lot of time
 
-        cookie := xcb.configure_window_checked(
-            conn, wid,
-            xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y | xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT | xcb.CONFIG_WINDOW_BORDER_WIDTH,
-            &[5]u32{
-                transmute(u32) i32(geometry.x + i16(geometry.width  / 2) - i16(geometry.border_width)),
-                transmute(u32) i32(geometry.y + i16(geometry.height / 2) - i16(geometry.border_width)),
-                u32(1),
-                u32(1),
-                u32(geometry.border_width),
-            },
+        xcb.configure_window(conn, wid, xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT, &[2]u32{1, 1})
+        xcb.change_save_set(conn, xcb.SET_MODE_INSERT, wid)
+        xcb.reparent_window(conn, wid, vd.viewport,
+            geometry.x + i16(geometry.width  / 2) - i16(geometry.border_width),
+            geometry.y + i16(geometry.height / 2) - i16(geometry.border_width),
         )
-
-        errors.check_cookie(conn, cookie, "Error configuring window %d\n", wid) or_return
     }
 
     geometry.width   -= 2 * border_width

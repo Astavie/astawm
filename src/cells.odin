@@ -22,8 +22,11 @@ cells :: proc(using s : ^wm.WindowManager, ctx : ^xcb_errors.Context) -> Maybe(e
     // Get screen
     windows.gain_control(s, screen.root) or_return
 
+    // Get all top-level windows
+    children := windows.get_children(s, screen.root) or_return
+
     // Create virtual desktop
-    vd := desktop.new(windows.Geometry {
+    vd := desktop.create(s, windows.Geometry {
         x = 0,
         y = 0,
         width = screen.width_in_pixels,
@@ -31,10 +34,7 @@ cells :: proc(using s : ^wm.WindowManager, ctx : ^xcb_errors.Context) -> Maybe(e
         border_width = 0,
     }) or_return
 
-    defer desktop.free(vd)
-
-    // Get all top-level windows
-    children := windows.get_children(s, screen.root) or_return
+    defer desktop.destroy(s, vd)
 
     for child in children {
         // Place window within the virtual desktop
@@ -125,6 +125,9 @@ cells :: proc(using s : ^wm.WindowManager, ctx : ^xcb_errors.Context) -> Maybe(e
 
             case xcb.UNMAP_NOTIFY:
                 umn := cast(^xcb.UnmapNotifyEvent) event
+
+                // Ignore if triggered by reparenting
+                if umn.event == screen.root do break
 
                 // Remove window from virtual desktop
                 desktop.remove_window(vd, umn.window)

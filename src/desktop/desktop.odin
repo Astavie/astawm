@@ -1,10 +1,10 @@
 package desktop
 
 import "../vendor/xcb"
+import "../wm"
 import "../wm/errors"
 import "../windows"
 
-import "core:builtin"
 import "core:slice"
 
 ScrollDirection :: enum {
@@ -15,7 +15,10 @@ ScrollDirection :: enum {
 }
 
 VirtualDesktop :: struct {
-    viewport : windows.Geometry,
+    viewport : xcb.Window,
+
+    width : u16,
+    height : u16,
     gap : u16,
     padding : Padding,
 
@@ -60,11 +63,39 @@ CELLS_PADDING :: Padding {
 }
 
 // Create virtual desktop
-new :: proc(geometry : windows.Geometry) -> (vd : ^VirtualDesktop, e : Maybe(errors.X11Error)) {
+create :: proc(using s : ^wm.WindowManager, geometry : windows.Geometry) -> (vd : ^VirtualDesktop, e : Maybe(errors.X11Error)) {
 
-    vd = builtin.new(VirtualDesktop)
+    viewport := xcb.generate_id(conn)
 
-    vd.viewport = geometry
+    errors.check_cookie(
+        conn,
+        xcb.create_window_checked(
+            conn, screen.root_depth, viewport, screen.root,
+            geometry.x, geometry.y, geometry.width, geometry.height, geometry.border_width,
+            xcb.WINDOW_CLASS_INPUT_OUTPUT, screen.root_visual,
+            xcb.CW_EVENT_MASK, &[1]u32{xcb.EVENT_MASK_SUBSTRUCTURE_REDIRECT | xcb.EVENT_MASK_SUBSTRUCTURE_NOTIFY},
+        ),
+        "Could not create viewport window\n",
+    ) or_return
+
+    errors.check_cookie(
+        conn,
+        xcb.change_window_attributes_checked(conn, viewport, xcb.CW_BACK_PIXEL, &[1]u32{0x0000FF}),
+        "Could not change attributes of viewport window\n",
+    ) or_return
+
+    errors.check_cookie(
+        conn,
+        xcb.map_window_checked(conn, viewport),
+        "Could not map viewport window to screen\n",
+    ) or_return
+
+    vd = new(VirtualDesktop)
+
+    vd.viewport = viewport
+
+    vd.width = geometry.width
+    vd.height = geometry.height
     vd.gap = CELLS_GAP
     vd.padding = CELLS_PADDING
     
@@ -82,7 +113,9 @@ new :: proc(geometry : windows.Geometry) -> (vd : ^VirtualDesktop, e : Maybe(err
 }
 
 // Delete desktop
-free :: proc(vd : ^VirtualDesktop) {
+destroy :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop) {
+    xcb.destroy_window(conn, vd.viewport)
+
     delete(vd.grid_windows)
     delete(vd.floating_windows)
 
@@ -91,7 +124,7 @@ free :: proc(vd : ^VirtualDesktop) {
     delete(vd.custom_columns)
     delete(vd.custom_rows)
 
-    builtin.free(vd)
+    free(vd)
 }
 
 // Removes a window from the virtual desktop

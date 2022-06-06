@@ -35,8 +35,8 @@ grid_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
 // Scrolls the grid to a cell
 grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds : Cell) {
     // Get scroll target
-    view_w := i16(vd.viewport.width  - vd.padding.left - vd.padding.right)
-    view_h := i16(vd.viewport.height - vd.padding.top  - vd.padding.bottom)
+    view_w := i16(vd.width  - vd.padding.left - vd.padding.right)
+    view_h := i16(vd.height - vd.padding.top  - vd.padding.bottom)
 
     geometry := cell_geometry(vd, bounds)
 
