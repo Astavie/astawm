@@ -6,7 +6,6 @@ import "errors"
 import "core:slice"
 import "core:sync"
 import "core:c/libc"
-import "core:fmt"
 
 Geometry :: struct {
     x : i16,
@@ -126,12 +125,12 @@ configure_window_discard :: proc(using s : ^WindowManager, change : GeometryChan
 }
 
 @(private="file")
-apply :: proc(i : $T, f : f32) -> T {
-    return T(f32(i) * f)
-}
-
-@(private="file")
 apply_change :: proc(change : GeometryChange, f : f32, c1 : f32) -> GeometryChange {
+
+    apply :: proc(i : $T, f : f32) -> T {
+        return T(f32(i) * f)
+    }
+
     c3 := c1 + 1
 
     f1 := f - 1

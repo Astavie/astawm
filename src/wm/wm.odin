@@ -9,7 +9,7 @@ WindowManager :: struct {
     conn : ^xcb.Connection,
     screen : ^xcb.Screen,
 
-    // Animation info
+    // Animation info, should not be accessed outside this package
 
     animation_mutex : sync.Recursive_Mutex,
     animations : map[xcb.Window][dynamic]Animation,
