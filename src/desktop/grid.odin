@@ -43,11 +43,11 @@ grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds
     x := vd.scroll_x
     y := vd.scroll_y
 
-    if geometry.x + i16(geometry.width)  > x + view_w do x = geometry.x + i16(geometry.width)  - view_w
-    if geometry.y + i16(geometry.height) > y + view_h do y = geometry.y + i16(geometry.height) - view_h
-
     if geometry.x < x do x = geometry.x
     if geometry.y < y do y = geometry.y
+
+    if geometry.x + i16(geometry.width)  > x + view_w do x = geometry.x + i16(geometry.width)  - view_w
+    if geometry.y + i16(geometry.height) > y + view_h do y = geometry.y + i16(geometry.height) - view_h
 
     if x == vd.scroll_x && y == vd.scroll_y do return
 

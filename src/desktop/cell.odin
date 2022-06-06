@@ -5,8 +5,6 @@ import "../wm/errors"
 import "../windows"
 import "../wm"
 
-import "core:fmt"
-
 // Checks if a rectangle is free of any windows
 cell_is_free :: proc(vd : ^VirtualDesktop, rect : Cell, ignore : xcb.Window = xcb.WINDOW_NONE) -> bool {
     for wid, bounds in vd.grid_windows {
