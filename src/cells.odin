@@ -6,7 +6,7 @@ import "errors"
 import "atoms"
 import "windows"
 import "desktop"
-import "server"
+import "wm"
 
 import "core:fmt"
 import "core:c/libc"
@@ -15,7 +15,7 @@ import "core:thread"
 import "core:time"
 
 // Main loop
-cells :: proc(using s : ^server.Server, ctx : ^xcb_errors.Context) -> Maybe(errors.X11Error) {
+cells :: proc(using s : ^wm.WindowManager, ctx : ^xcb_errors.Context) -> Maybe(errors.X11Error) {
     // Get atoms
     atoms.init(s) or_return
 
@@ -136,9 +136,9 @@ cells :: proc(using s : ^server.Server, ctx : ^xcb_errors.Context) -> Maybe(erro
 }
 
 // Animations thread
-animations :: proc(using s : ^server.Server, running : ^bool) {
+animations :: proc(using s : ^wm.WindowManager, running : ^bool) {
     for running^ {
-        server.update_animations(s)
+        wm.update_animations(s)
         xcb.flush(conn)
         time.accurate_sleep(time.Second / 60)
     }
@@ -147,9 +147,9 @@ animations :: proc(using s : ^server.Server, running : ^bool) {
 // Main function
 main :: proc() {
     // Connect to the X server
-    s, ok := server.connect()
+    s, ok := wm.connect()
     if !ok do return
-    defer server.disconnect(s)
+    defer wm.disconnect(s)
 
     // Create xcb error context
     ctx : ^xcb_errors.Context = ---

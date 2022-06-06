@@ -1,11 +1,11 @@
-package server
+package wm
 
 import "../vendor/xcb"
 
 import "core:fmt"
 import "core:sync"
 
-Server :: struct {
+WindowManager :: struct {
     conn : ^xcb.Connection,
     screen : ^xcb.Screen,
 
@@ -21,8 +21,8 @@ Server :: struct {
 }
 
 // Connect to the X server
-connect :: proc() -> (^Server, bool) {
-    using s := new(Server)
+connect :: proc() -> (^WindowManager, bool) {
+    using s := new(WindowManager)
     animations = make(map[xcb.Window]Animation)
 
     screen_index : i32 = ---
@@ -40,7 +40,7 @@ connect :: proc() -> (^Server, bool) {
 }
 
 // Disconnect from the X server
-disconnect :: proc(using s : ^Server) {
+disconnect :: proc(using s : ^WindowManager) {
     xcb.disconnect(conn)
     delete(animations)
     free(s)

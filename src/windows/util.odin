@@ -2,13 +2,13 @@ package windows
 
 import "../vendor/xcb"
 import "../errors"
-import "../server"
+import "../wm"
 
 import "core:c/libc"
 import "core:mem"
 
 // Checks if this window manager should be able to manipulate a specific window
-can_manipulate :: proc(using s : ^server.Server, wid : xcb.Window) -> (b : bool, merr : Maybe(errors.X11Error)) {
+can_manipulate :: proc(using s : ^wm.WindowManager, wid : xcb.Window) -> (b : bool, merr : Maybe(errors.X11Error)) {
     cookie := xcb.get_window_attributes(conn, wid)
 
     err : ^xcb.GenericError = ---
@@ -21,7 +21,7 @@ can_manipulate :: proc(using s : ^server.Server, wid : xcb.Window) -> (b : bool,
 }
 
 // Gain control of a window
-gain_control :: proc(using s : ^server.Server, wid : xcb.Window) -> Maybe(errors.X11Error) {
+gain_control :: proc(using s : ^wm.WindowManager, wid : xcb.Window) -> Maybe(errors.X11Error) {
     mask := xcb.EVENT_MASK_SUBSTRUCTURE_REDIRECT | xcb.EVENT_MASK_SUBSTRUCTURE_NOTIFY
     cookie := xcb.change_window_attributes_checked(conn, wid, xcb.CW_EVENT_MASK, &mask)
 
@@ -30,7 +30,7 @@ gain_control :: proc(using s : ^server.Server, wid : xcb.Window) -> Maybe(errors
 }
 
 // Get children of window
-get_children :: proc(using s : ^server.Server, wid : xcb.Window, alloc := context.allocator) -> (w : []xcb.Window, e : Maybe(errors.X11Error)) {
+get_children :: proc(using s : ^wm.WindowManager, wid : xcb.Window, alloc := context.allocator) -> (w : []xcb.Window, e : Maybe(errors.X11Error)) {
     cookie := xcb.query_tree(conn, wid)
     
     err : ^xcb.GenericError = ---
@@ -47,13 +47,13 @@ get_children :: proc(using s : ^server.Server, wid : xcb.Window, alloc := contex
 }
 
 // Animate window moving
-start_animation :: proc(using s : ^server.Server, to : Geometry, frames : int, bouce : f32, wid : xcb.Window) {
-    if server.guard_animations(s) {
+start_animation :: proc(using s : ^wm.WindowManager, to : Geometry, frames : int, bouce : f32, wid : xcb.Window) {
+    if wm.guard_animations(s) {
 
         m := get_geometry_unchecked(s, wid)
         if m == nil do return
 
-        animations[wid] = server.Animation {
+        animations[wid] = wm.Animation {
             from = m.?,
             to = to,
             frames = frames,

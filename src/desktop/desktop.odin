@@ -3,7 +3,6 @@ package desktop
 import "../vendor/xcb"
 import "../errors"
 import "../windows"
-import "../server"
 
 import "core:builtin"
 import "core:slice"

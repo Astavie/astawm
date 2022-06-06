@@ -1,4 +1,4 @@
-package server
+package wm
 
 import "../vendor/xcb"
 
@@ -27,21 +27,21 @@ Movement :: struct {
     bounce : f32,
 }
 
-lock_animations :: proc(using s : ^Server) {
+lock_animations :: proc(using s : ^WindowManager) {
     sync.recursive_mutex_lock(&animation_mutex)
 }
 
-unlock_animations :: proc(using s : ^Server) {
+unlock_animations :: proc(using s : ^WindowManager) {
     sync.recursive_mutex_unlock(&animation_mutex)
 }
 
 @(deferred_in=unlock_animations)
-guard_animations :: proc(using s : ^Server) -> bool {
+guard_animations :: proc(using s : ^WindowManager) -> bool {
     lock_animations(s)
     return true
 }
 
-configure_window_discard :: proc(using s : ^Server, wid : xcb.Window, geometry : Geometry) {
+configure_window_discard :: proc(using s : ^WindowManager, wid : xcb.Window, geometry : Geometry) {
     cookie := xcb.configure_window(
         conn, wid,
         xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y | xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT | xcb.CONFIG_WINDOW_BORDER_WIDTH,
@@ -57,7 +57,7 @@ configure_window_discard :: proc(using s : ^Server, wid : xcb.Window, geometry :
     xcb.discard_reply(conn, cookie.sequence)
 }
 
-move_window_discard :: proc(using s : ^Server, wid : xcb.Window, dx, dy : i16) {
+move_window_discard :: proc(using s : ^WindowManager, wid : xcb.Window, dx, dy : i16) {
     reply := xcb.get_geometry_reply(conn, xcb.get_geometry(conn, wid), nil)
     if reply == nil do return
 
@@ -78,7 +78,7 @@ apply :: proc(from, to : $T, f : f32, c1 : f32) -> T {
     c3 := c1 + 1
 
     f1 := f - 1
-    f1  = 1 + c3 * f1 * f1 * f1 + c1 * f1 * f1
+    f1 = 1 + c3 * f1 * f1 * f1 + c1 * f1 * f1
 
     return T(f32(from) + (f32(to) - f32(from)) * f1)
 }
@@ -94,7 +94,7 @@ apply_geometry :: proc(from, to : Geometry, f : f32, c1 : f32) -> Geometry {
     }
 }
 
-update_animations :: proc(using s : ^Server) {
+update_animations :: proc(using s : ^WindowManager) {
     // Enter animations lock
     if guard_animations(s) {
         // Update scroll
@@ -115,7 +115,7 @@ update_animations :: proc(using s : ^Server) {
                 dy = move.dy - y_prev
                 delete_key(&movements, wid)
             } else {
-                f  := f32(move.current_frame) / f32(move.frames)
+                f := f32(move.current_frame) / f32(move.frames)
                 dx = apply(i16(0), move.dx, f, move.bounce) - x_prev
                 dy = apply(i16(0), move.dy, f, move.bounce) - y_prev
             }

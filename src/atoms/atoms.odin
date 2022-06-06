@@ -2,19 +2,19 @@ package atoms
 
 import "../vendor/xcb"
 import "../errors"
-import "../server"
+import "../wm"
 
 import "core:strings"
 import "core:c/libc"
 
 // Looks up and saves atom variables
-init :: proc(using s : ^server.Server) -> Maybe(errors.X11Error) {
+init :: proc(using s : ^wm.WindowManager) -> Maybe(errors.X11Error) {
     _NET_WM_NAME = lookup(s, "_NET_WM_NAME") or_return
     return nil
 }
 
 // Get atom from name
-lookup :: proc(using s : ^server.Server, atom_name : cstring) -> (atom : xcb.Atom, merr : Maybe(errors.X11Error)) {
+lookup :: proc(using s : ^wm.WindowManager, atom_name : cstring) -> (atom : xcb.Atom, merr : Maybe(errors.X11Error)) {
     cookie := xcb.intern_atom(conn, 0, cast(u16) len(atom_name), atom_name)
     err : ^xcb.GenericError = ---
     reply := xcb.intern_atom_reply(conn, cookie, &err)
@@ -26,7 +26,7 @@ lookup :: proc(using s : ^server.Server, atom_name : cstring) -> (atom : xcb.Ato
 }
 
 // Get atom value for window
-get_value :: proc(using s : ^server.Server, atom : xcb.Atom, wid : xcb.Window) -> (reply : ^xcb.GetPropertyReply, merr : Maybe(errors.X11Error)) {
+get_value :: proc(using s : ^wm.WindowManager, atom : xcb.Atom, wid : xcb.Window) -> (reply : ^xcb.GetPropertyReply, merr : Maybe(errors.X11Error)) {
     cookie := xcb.get_property(conn, 0, wid, atom, xcb.GET_PROPERTY_TYPE_ANY, 0, ~u32(0))
     err : ^xcb.GenericError = ---
     reply = xcb.get_property_reply(conn, cookie, &err)
@@ -44,7 +44,7 @@ string_from_prop :: proc(reply : ^xcb.GetPropertyReply) -> string {
 }
 
 // Get string value for window
-get_string_value :: proc(using s : ^server.Server, atom : xcb.Atom, wid : xcb.Window, alloc := context.allocator) -> (str : string, e : Maybe(errors.X11Error)) {
+get_string_value :: proc(using s : ^wm.WindowManager, atom : xcb.Atom, wid : xcb.Window, alloc := context.allocator) -> (str : string, e : Maybe(errors.X11Error)) {
     reply := get_value(s, atom, wid) or_return
     defer libc.free(reply)
     return strings.clone(string_from_prop(reply), alloc), nil

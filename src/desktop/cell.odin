@@ -3,7 +3,7 @@ package desktop
 import "../vendor/xcb"
 import "../errors"
 import "../windows"
-import "../server"
+import "../wm"
 
 // Checks if a rectangle is free of any windows
 cell_is_free :: proc(vd : VirtualDesktop, rect : Cell, ignore : xcb.Window = xcb.WINDOW_NONE) -> bool {
@@ -113,7 +113,7 @@ cell_geometry :: proc(vd : VirtualDesktop, bounds : Cell, border_width : u16) ->
 }
 
 // Places a window within the grid of the virtual desktop
-cell_place_window :: proc(using s : ^server.Server, vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) {
+cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) {
     // Geometry of window
     geometry_maybe := windows.get_geometry_unchecked(s, wid)
     if geometry_maybe == nil do return
@@ -132,7 +132,7 @@ cell_place_window :: proc(using s : ^server.Server, vd : ^VirtualDesktop, wid : 
             border_width = geometry.border_width,
         }
 
-        server.configure_window_discard(s, wid, center)
+        wm.configure_window_discard(s, wid, center)
     }
 
     windows.start_animation(s, geometry, 15, 1, wid)

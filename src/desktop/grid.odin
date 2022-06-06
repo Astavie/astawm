@@ -3,10 +3,10 @@ package desktop
 import "../vendor/xcb"
 import "../errors"
 import "../windows"
-import "../server"
+import "../wm"
 
 // Place a new window opened by the user in the grid
-grid_place_window :: proc(using s : ^server.Server, vd : ^VirtualDesktop, wid : xcb.Window, width, height : u16) -> Maybe(errors.X11Error) {
+grid_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid : xcb.Window, width, height : u16) -> Maybe(errors.X11Error) {
     start_x, start_y := cell_at(
         vd^,
         i16(vd.padding.left),
@@ -37,7 +37,7 @@ grid_place_window :: proc(using s : ^server.Server, vd : ^VirtualDesktop, wid : 
 }
 
 // Scrolls the grid to a cell
-grid_scroll_to :: proc(using s : ^server.Server, vd : ^VirtualDesktop, bounds : Cell) {
+grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds : Cell) {
     // Get target cell
     current_x, current_y := cell_at(
         vd^,
@@ -75,7 +75,7 @@ grid_scroll_to :: proc(using s : ^server.Server, vd : ^VirtualDesktop, bounds : 
 
     // Setup scrolling
     // TODO: check if already scrolling
-    anim := server.Movement {
+    anim := wm.Movement {
         dx = -(x - vd.scroll_x),
         dy = -(y - vd.scroll_y),
         frames = 15,

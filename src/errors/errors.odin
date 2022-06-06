@@ -1,6 +1,6 @@
 package errors
 
-import "../server"
+import "../wm"
 import "../vendor/xcb"
 import "../vendor/xcb_errors"
 
@@ -36,7 +36,7 @@ check :: proc(err : ^xcb.GenericError, msg : string, args: ..any) -> Maybe(X11Er
 }
 
 // Checks an xcb cookie and if it caused an error, returns said error
-check_cookie :: proc(using s : ^server.Server, cookie : xcb.VoidCookie, msg : string, args: ..any) -> Maybe(X11Error) {
+check_cookie :: proc(using s : ^wm.WindowManager, cookie : xcb.VoidCookie, msg : string, args: ..any) -> Maybe(X11Error) {
     return check(xcb.request_check(conn, cookie), msg, ..args)
 }
 
