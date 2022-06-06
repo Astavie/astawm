@@ -1,7 +1,7 @@
 package desktop
 
 import "../vendor/xcb"
-import "../errors"
+import "../wm/errors"
 import "../windows"
 import "../wm"
 
@@ -30,7 +30,7 @@ grid_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
         height = 2,
     }) { bounds.height = 2 }
 
-    cell_place_window(s, vd, wid, bounds)
+    cell_place_window(s, vd, wid, bounds) or_return
     grid_scroll_to(s, vd, bounds)
 
     return nil
@@ -74,17 +74,13 @@ grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds
     y := i16(partial_y / total_y * f32(ydis)) + screen_y * i16(ydis)
 
     // Setup scrolling
-    // TODO: check if already scrolling
-    anim := wm.Movement {
-        dx = -(x - vd.scroll_x),
-        dy = -(y - vd.scroll_y),
-        frames = 15,
-        current_frame = 0,
-        bounce = 0,
+    change := wm.GeometryChange {
+        x = -(x - vd.scroll_x),
+        y = -(y - vd.scroll_y),
     }
 
     for wid in get_windows(vd^) {
-        movements[wid] = anim
+        wm.animate_change(s, change, 15, 0, wid)
     }
 
     vd.scroll_x = x

@@ -1,7 +1,7 @@
 package windows
 
 import "../vendor/xcb"
-import "../errors"
+import "../wm/errors"
 import "../atoms"
 import "../wm"
 

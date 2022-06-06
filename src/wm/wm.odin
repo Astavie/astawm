@@ -12,8 +12,7 @@ WindowManager :: struct {
     // Animation info
 
     animation_mutex : sync.Recursive_Mutex,
-    animations : map[xcb.Window]Animation,
-    movements : map[xcb.Window]Movement,
+    animations : map[xcb.Window][dynamic]Animation,
 
     // ATOMS
 
@@ -23,7 +22,7 @@ WindowManager :: struct {
 // Connect to the X server
 connect :: proc() -> (^WindowManager, bool) {
     using s := new(WindowManager)
-    animations = make(map[xcb.Window]Animation)
+    animations = make(map[xcb.Window][dynamic]Animation)
 
     screen_index : i32 = ---
     conn = xcb.connect(nil, &screen_index)

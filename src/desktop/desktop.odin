@@ -1,7 +1,7 @@
 package desktop
 
 import "../vendor/xcb"
-import "../errors"
+import "../wm/errors"
 import "../windows"
 
 import "core:builtin"

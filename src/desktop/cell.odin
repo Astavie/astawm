@@ -1,7 +1,7 @@
 package desktop
 
 import "../vendor/xcb"
-import "../errors"
+import "../wm/errors"
 import "../windows"
 import "../wm"
 
@@ -113,30 +113,34 @@ cell_geometry :: proc(vd : VirtualDesktop, bounds : Cell, border_width : u16) ->
 }
 
 // Places a window within the grid of the virtual desktop
-cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) {
+cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) -> Maybe(errors.X11Error) {
     // Geometry of window
-    geometry_maybe := windows.get_geometry_unchecked(s, wid)
-    if geometry_maybe == nil do return
-
-    geometry := cell_geometry(vd^, bounds, geometry_maybe.?.border_width)
+    border_width := (windows.get_geometry(s, wid) or_return).border_width
+    geometry := cell_geometry(vd^, bounds, border_width)
 
     // Place window in virtual desktop
     if !has_window(vd, wid) {
         // Start from center of geometry
         // TODO resizing while mapped costs a lot of time
-        center := windows.Geometry {
-            x = geometry.x + i16((geometry.width - 1) / 2)  - i16(geometry.border_width),
-            y = geometry.y + i16((geometry.height - 1) / 2) - i16(geometry.border_width),
-            width = 1,
-            height = 1,
-            border_width = geometry.border_width,
-        }
 
-        wm.configure_window_discard(s, wid, center)
+        cookie := xcb.configure_window_checked(
+            conn, wid,
+            xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y | xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT | xcb.CONFIG_WINDOW_BORDER_WIDTH,
+            &[5]u32{
+                transmute(u32) i32(geometry.x + i16((geometry.width - 1) / 2)  - i16(geometry.border_width)),
+                transmute(u32) i32(geometry.y + i16((geometry.height - 1) / 2) - i16(geometry.border_width)),
+                u32(1),
+                u32(1),
+                u32(geometry.border_width),
+            },
+        )
+
+        errors.check_cookie(conn, cookie, "Error configuring window %d\n", wid) or_return
     }
 
-    windows.start_animation(s, geometry, 15, 1, wid)
+    wm.animate_to(s, geometry, 15, 1, wid) or_return
 
     remove_window(vd, wid)
     vd.grid_windows[wid] = bounds
+    return nil
 }

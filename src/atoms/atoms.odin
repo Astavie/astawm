@@ -1,7 +1,7 @@
 package atoms
 
 import "../vendor/xcb"
-import "../errors"
+import "../wm/errors"
 import "../wm"
 
 import "core:strings"

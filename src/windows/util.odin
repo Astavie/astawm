@@ -1,7 +1,7 @@
 package windows
 
 import "../vendor/xcb"
-import "../errors"
+import "../wm/errors"
 import "../wm"
 
 import "core:c/libc"
@@ -25,7 +25,7 @@ gain_control :: proc(using s : ^wm.WindowManager, wid : xcb.Window) -> Maybe(err
     mask := xcb.EVENT_MASK_SUBSTRUCTURE_REDIRECT | xcb.EVENT_MASK_SUBSTRUCTURE_NOTIFY
     cookie := xcb.change_window_attributes_checked(conn, wid, xcb.CW_EVENT_MASK, &mask)
 
-    errors.check_cookie(s, cookie, "Could not gain control of window %d\n", wid) or_return
+    errors.check_cookie(conn, cookie, "Could not gain control of window %d\n", wid) or_return
     return nil
 }
 
@@ -44,22 +44,4 @@ get_children :: proc(using s : ^wm.WindowManager, wid : xcb.Window, alloc := con
 
     arr := mem.slice_ptr(ptr, len)
     return mem.clone_slice(arr, alloc), nil
-}
-
-// Animate window moving
-start_animation :: proc(using s : ^wm.WindowManager, to : Geometry, frames : int, bouce : f32, wid : xcb.Window) {
-    if wm.guard_animations(s) {
-
-        m := get_geometry_unchecked(s, wid)
-        if m == nil do return
-
-        animations[wid] = wm.Animation {
-            from = m.?,
-            to = to,
-            frames = frames,
-            current_frame = 0,
-            bounce = bouce,
-        }
-        
-    }
 }

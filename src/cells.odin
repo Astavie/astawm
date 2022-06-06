@@ -2,7 +2,7 @@ package main
 
 import "vendor/xcb"
 import "vendor/xcb_errors"
-import "errors"
+import "wm/errors"
 import "atoms"
 import "windows"
 import "desktop"
