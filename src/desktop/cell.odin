@@ -6,7 +6,7 @@ import "../windows"
 import "../wm"
 
 // Checks if a rectangle is free of any windows
-cell_is_free :: proc(vd : VirtualDesktop, rect : Cell, ignore : xcb.Window = xcb.WINDOW_NONE) -> bool {
+cell_is_free :: proc(vd : ^VirtualDesktop, rect : Cell, ignore : xcb.Window = xcb.WINDOW_NONE) -> bool {
     for wid, bounds in vd.grid_windows {
         if wid == ignore do continue
         if rect.x >= bounds.x + i16(bounds.width)  || bounds.x >= rect.x + i16(rect.width)  do continue
@@ -28,7 +28,7 @@ divmod :: proc(a : i16, b : u16) -> (div : i16, mod : i16) {
 }
 
 // Get cell at viewport position (px, py)
-cell_at :: proc(vd : VirtualDesktop, px, py : i16) -> (i16, i16) {
+cell_at :: proc(vd : ^VirtualDesktop, px, py : i16) -> (i16, i16) {
     // Get screen number and pixels within screen
     xdis, ydis := view_distance(vd)
 
@@ -63,7 +63,7 @@ cell_at :: proc(vd : VirtualDesktop, px, py : i16) -> (i16, i16) {
 
 // Get position and size in pixels of cell rectangle
 // TODO: comply with window size requests
-cell_geometry :: proc(vd : VirtualDesktop, bounds : Cell, border_width : u16) -> windows.Geometry {
+cell_geometry :: proc(vd : ^VirtualDesktop, bounds : Cell, border_width : u16) -> windows.Geometry {
     columns := u16(len(vd.columns))
     rows    := u16(len(vd.rows))
 
@@ -116,7 +116,7 @@ cell_geometry :: proc(vd : VirtualDesktop, bounds : Cell, border_width : u16) ->
 cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) -> Maybe(errors.X11Error) {
     // Geometry of window
     border_width := (windows.get_geometry(s, wid) or_return).border_width
-    geometry := cell_geometry(vd^, bounds, border_width)
+    geometry := cell_geometry(vd, bounds, border_width)
 
     // Place window in virtual desktop
     if !has_window(vd, wid) {

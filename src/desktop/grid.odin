@@ -8,7 +8,7 @@ import "../wm"
 // Place a new window opened by the user in the grid
 grid_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid : xcb.Window, width, height : u16) -> Maybe(errors.X11Error) {
     start_x, start_y := cell_at(
-        vd^,
+        vd,
         i16(vd.padding.left),
         i16(vd.padding.top),
     )
@@ -20,10 +20,10 @@ grid_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
         height = height,
     }
 
-    bounds := grid_find_free_cell(vd^, wid, start)
+    bounds := grid_find_free_cell(vd, wid, start)
 
     // Test code
-    if cell_is_free(vd^, Cell {
+    if cell_is_free(vd, Cell {
         x = start_x,
         y = start_y,
         width = 1,
@@ -40,7 +40,7 @@ grid_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
 grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds : Cell) {
     // Get target cell
     current_x, current_y := cell_at(
-        vd^,
+        vd,
         i16(vd.padding.left),
         i16(vd.padding.top),
     )
@@ -69,7 +69,7 @@ grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds
     for column in vd.columns[:inner_x] do partial_x += column
     for row    in vd.rows   [:inner_y] do partial_y += row
 
-    xdis, ydis := view_distance(vd^)
+    xdis, ydis := view_distance(vd)
     x := i16(partial_x / total_x * f32(xdis)) + screen_x * i16(xdis)
     y := i16(partial_y / total_y * f32(ydis)) + screen_y * i16(ydis)
 
@@ -79,7 +79,7 @@ grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds
         y = -(y - vd.scroll_y),
     }
 
-    for wid in get_windows(vd^) {
+    for wid in get_windows(vd) {
         wm.animate_change(s, change, 15, 0, wid)
     }
 
@@ -88,7 +88,7 @@ grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds
 }
 
 // Gets the first free spot for a window based on the current view
-grid_find_free_cell :: proc(vd : VirtualDesktop, wid : xcb.Window, bounds : Cell) -> Cell {
+grid_find_free_cell :: proc(vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) -> Cell {
     x := bounds.x
     y := bounds.y
 

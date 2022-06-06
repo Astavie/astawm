@@ -58,31 +58,33 @@ CELLS_PADDING :: Padding {
 }
 
 // Create virtual desktop
-make :: proc(geometry : windows.Geometry) -> (vd : VirtualDesktop, e : Maybe(errors.X11Error)) {
-    // return
-    return VirtualDesktop {
-        viewport = geometry,
-        gap = CELLS_GAP,
-        padding = CELLS_PADDING,
+new :: proc(geometry : windows.Geometry) -> (vd : ^VirtualDesktop, e : Maybe(errors.X11Error)) {
 
-        columns = slice.clone(CELLS_COLUMNS),
-        rows = slice.clone(CELLS_ROWS),
-        scroll = CELLS_DIRECTION,
-        scroll_x = 0,
-        scroll_y = 0,
+    vd = builtin.new(VirtualDesktop)
 
-        grid_windows     = builtin.make(map[xcb.Window]Cell),
-        floating_windows = builtin.make(map[xcb.Window]struct{}),
-    }, nil
+    vd.viewport = geometry
+    vd.gap = CELLS_GAP
+    vd.padding = CELLS_PADDING
+    
+    vd.columns = slice.clone(CELLS_COLUMNS)
+    vd.rows = slice.clone(CELLS_ROWS)
+    vd.scroll = CELLS_DIRECTION
+
+    vd.grid_windows     = make(map[xcb.Window]Cell)
+    vd.floating_windows = make(map[xcb.Window]struct{})
+
+    return
 }
 
 // Delete desktop
-delete :: proc(vd : VirtualDesktop) {
-    builtin.delete(vd.grid_windows)
-    builtin.delete(vd.floating_windows)
+free :: proc(vd : ^VirtualDesktop) {
+    delete(vd.grid_windows)
+    delete(vd.floating_windows)
 
-    builtin.delete(vd.columns)
-    builtin.delete(vd.rows)
+    delete(vd.columns)
+    delete(vd.rows)
+
+    builtin.free(vd)
 }
 
 // Removes a window from the virtual desktop
@@ -97,14 +99,14 @@ has_window :: proc(vd : ^VirtualDesktop, wid : xcb.Window) -> bool {
 }
 
 // Get distance between screens
-view_distance :: proc(vd : VirtualDesktop) -> (u16, u16) {
+view_distance :: proc(vd : ^VirtualDesktop) -> (u16, u16) {
     xdis := vd.viewport.width  - vd.padding.left - vd.padding.right  + vd.gap
     ydis := vd.viewport.height - vd.padding.top  - vd.padding.bottom + vd.gap
     return xdis, ydis
 }
 
 // Get all windows
-get_windows :: proc(vd : VirtualDesktop) -> []xcb.Window {
+get_windows :: proc(vd : ^VirtualDesktop) -> []xcb.Window {
     return slice.concatenate([][]xcb.Window{
         slice.map_keys(vd.floating_windows),
         slice.map_keys(vd.grid_windows),

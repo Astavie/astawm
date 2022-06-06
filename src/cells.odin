@@ -23,7 +23,7 @@ cells :: proc(using s : ^wm.WindowManager, ctx : ^xcb_errors.Context) -> Maybe(e
     windows.gain_control(s, screen.root) or_return
 
     // Create virtual desktop
-    vd := desktop.make(windows.Geometry {
+    vd := desktop.new(windows.Geometry {
         x = 0,
         y = 0,
         width = screen.width_in_pixels,
@@ -31,7 +31,7 @@ cells :: proc(using s : ^wm.WindowManager, ctx : ^xcb_errors.Context) -> Maybe(e
         border_width = 0,
     }) or_return
 
-    defer desktop.delete(vd)
+    defer desktop.free(vd)
 
     // Get all top-level windows
     children := windows.get_children(s, screen.root) or_return
@@ -43,7 +43,7 @@ cells :: proc(using s : ^wm.WindowManager, ctx : ^xcb_errors.Context) -> Maybe(e
         // TODO: check if window should be tiled or should stay floating
         errors.print_maybe(
             ctx,
-            desktop.grid_place_window(s, &vd, child, 1, 1),
+            desktop.grid_place_window(s, vd, child, 1, 1),
         )
     }
 
@@ -78,7 +78,7 @@ cells :: proc(using s : ^wm.WindowManager, ctx : ^xcb_errors.Context) -> Maybe(e
                 mre := cast(^xcb.MapRequestEvent) event
                 errors.print_maybe(
                     ctx,
-                    desktop.grid_place_window(s, &vd, mre.window, 1, 1),
+                    desktop.grid_place_window(s, vd, mre.window, 1, 1),
                 )
                 xcb.map_window(conn, mre.window)
                 xcb.flush(conn)
@@ -127,7 +127,7 @@ cells :: proc(using s : ^wm.WindowManager, ctx : ^xcb_errors.Context) -> Maybe(e
                 umn := cast(^xcb.UnmapNotifyEvent) event
 
                 // Remove window from virtual desktop
-                desktop.remove_window(&vd, umn.window)
+                desktop.remove_window(vd, umn.window)
                 xcb.flush(conn)
         }
     }

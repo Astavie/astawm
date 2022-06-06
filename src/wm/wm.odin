@@ -13,6 +13,8 @@ WindowManager :: struct {
 
     animation_mutex : sync.Recursive_Mutex,
     animations : map[xcb.Window][dynamic]Animation,
+    
+    // NOTE: if it seems animations desync window geometries over time, it might be best to also keep track of the desired final geometry
 
     // ATOMS
 
