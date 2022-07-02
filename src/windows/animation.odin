@@ -1,19 +1,19 @@
-package wm
+package windows
 
 import "../vendor/xcb"
-import "errors"
+import "../util"
+import "../wm"
 
 import "core:slice"
 import "core:sync"
 import "core:c/libc"
 
-Geometry :: struct {
-    x : i16,
-    y : i16,
-    width : u16,
-    height : u16,
-    border_width : u16,
-}
+@(private="file")
+animation_mutex : sync.Recursive_Mutex
+
+// NOTE: this map currently gets allocated implicitly and is never destroyed
+@(private="file")
+animations : map[xcb.Window][dynamic]Animation
 
 GeometryChange :: struct {
     x : i16,
@@ -33,23 +33,19 @@ Animation :: struct {
 // Transforms a window's geometry over time
 //
 // The window's geometry is guaranteed to land on the specified geometry when *all* animations are complete
-animate_to :: proc(using s : ^WindowManager, geometry : Geometry, frames : int, bounce : f32, wid : xcb.Window) -> Maybe(errors.X11Error) {
+animate_to :: proc(geometry : util.Geometry, frames : int, bounce : f32, wid : xcb.Window) -> Maybe(wm.X11Error) {
     // Enter animations lock
-    if guard_animations(s) {
+    if guard_animations() {
 
-        err : ^xcb.GenericError = ---
-        reply := xcb.get_geometry_reply(conn, xcb.get_geometry(conn, wid), &err)
-        errors.check(err, "Error getting geometry for window %d\n", wid) or_return
+        current := get_geometry(wid) or_return
 
         change := GeometryChange {
-            x = geometry.x - reply.x,
-            y = geometry.y - reply.y,
-            width = i16(geometry.width) - i16(reply.width),
-            height = i16(geometry.height) - i16(reply.height),
-            border_width = i16(geometry.border_width) - i16(reply.border_width),
+            x = geometry.x - current.x,
+            y = geometry.y - current.y,
+            width = i16(geometry.width) - i16(current.width),
+            height = i16(geometry.height) - i16(current.height),
+            border_width = i16(geometry.border_width) - i16(current.border_width),
         }
-
-        libc.free(reply)
         
         if arr, ok := animations[wid]; ok {
             for anim in arr {
@@ -61,7 +57,7 @@ animate_to :: proc(using s : ^WindowManager, geometry : Geometry, frames : int, 
             }
         }
 
-        animate_change(s, change, frames, bounce, wid)
+        animate_change(change, frames, bounce, wid)
 
     }
     return nil
@@ -70,8 +66,8 @@ animate_to :: proc(using s : ^WindowManager, geometry : Geometry, frames : int, 
 // Transforms a window's geometry over time
 //
 // If the window is already being transformed, this change will be added to all existing changes
-animate_change :: proc(using s : ^WindowManager, change : GeometryChange, frames : int, bounce : f32, wid : xcb.Window) {
-    if guard_animations(s) {
+animate_change :: proc(change : GeometryChange, frames : int, bounce : f32, wid : xcb.Window) {
+    if guard_animations() {
 
         anim := Animation {
             change = change,
@@ -89,27 +85,27 @@ animate_change :: proc(using s : ^WindowManager, change : GeometryChange, frames
     }
 }
 
-lock_animations :: proc(using s : ^WindowManager) {
+lock_animations :: proc() {
     sync.recursive_mutex_lock(&animation_mutex)
 }
 
-unlock_animations :: proc(using s : ^WindowManager) {
+unlock_animations :: proc() {
     sync.recursive_mutex_unlock(&animation_mutex)
 }
 
 @(deferred_in=unlock_animations)
-guard_animations :: proc(using s : ^WindowManager) -> bool {
-    lock_animations(s)
+guard_animations :: proc() -> bool {
+    lock_animations()
     return true
 }
 
 @(private="file")
-configure_window_discard :: proc(using s : ^WindowManager, change : GeometryChange, wid : xcb.Window) {
-    reply := xcb.get_geometry_reply(conn, xcb.get_geometry(conn, wid), nil)
+configure_window_discard :: proc(change : GeometryChange, wid : xcb.Window) {
+    reply := xcb.get_geometry_reply(wm.connection, xcb.get_geometry(wm.connection, wid), nil)
     if reply == nil do return
 
     cookie := xcb.configure_window(
-        conn, wid,
+        wm.connection, wid,
         xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y | xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT | xcb.CONFIG_WINDOW_BORDER_WIDTH,
         &[5]u32{
             transmute(u32) i32(reply.x + change.x),
@@ -121,7 +117,7 @@ configure_window_discard :: proc(using s : ^WindowManager, change : GeometryChan
     )
 
     libc.free(reply)
-    xcb.discard_reply(conn, cookie.sequence)
+    xcb.discard_reply(wm.connection, cookie.sequence)
 }
 
 @(private="file")
@@ -137,17 +133,17 @@ apply_change :: proc(change : GeometryChange, f : f32, c1 : f32) -> GeometryChan
     f1 = 1 + c3 * f1 * f1 * f1 + c1 * f1 * f1
 
     return GeometryChange {
-        x = apply(change.x, f1),
-        y = apply(change.y, f1),
-        width = apply(change.width, f1),
-        height = apply(change.height, f1),
+        x            = apply(change.x, f1),
+        y            = apply(change.y, f1),
+        width        = apply(change.width, f1),
+        height       = apply(change.height, f1),
         border_width = apply(change.border_width, f1),
     }
 }
 
-update_animations :: proc(using s : ^WindowManager) {
+update_animations :: proc() {
     // Enter animations lock
-    if guard_animations(s) {
+    if guard_animations() {
 
         // Update animations
         keys := slice.map_keys(animations)
@@ -194,7 +190,7 @@ update_animations :: proc(using s : ^WindowManager) {
             }
 
             // Move window
-            if total != {} do configure_window_discard(s, total, wid)
+            if total != {} do configure_window_discard(total, wid)
 
             // Untrack window if all animations are done
             if len(arr) == 0 {

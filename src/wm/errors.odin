@@ -1,7 +1,7 @@
-package errors
+package wm
 
-import "../../vendor/xcb"
-import "../../vendor/xcb_errors"
+import "../vendor/xcb"
+import "../vendor/xcb_errors"
 
 import "core:fmt"
 import "core:c/libc"
@@ -36,7 +36,7 @@ check :: proc(err : ^xcb.GenericError, msg : string, args: ..any) -> Maybe(X11Er
 
 // Checks an xcb cookie and if it caused an error, returns said error
 check_cookie :: proc(conn : ^xcb.Connection, cookie : xcb.VoidCookie, msg : string, args: ..any) -> Maybe(X11Error) {
-    return check(xcb.request_check(conn, cookie), msg, ..args)
+    return check(xcb.request_check(connection, cookie), msg, ..args)
 }
 
 // Turn xcb error into cells error

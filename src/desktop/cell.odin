@@ -1,11 +1,9 @@
 package desktop
 
 import "../vendor/xcb"
-import "../wm/errors"
 import "../windows"
 import "../wm"
-
-import "core:fmt"
+import "../util"
 
 // Checks if a rectangle is free of any windows
 cell_is_free :: proc(vd : ^VirtualDesktop, rect : Cell, ignore : xcb.Window = xcb.WINDOW_NONE) -> bool {
@@ -94,7 +92,7 @@ cell_at :: proc(vd : ^VirtualDesktop, px, py : i16) -> (i16, i16) {
 }
 
 // Get position and size in pixels of cell rectangle with internal coordinates
-cell_geometry :: proc(vd : ^VirtualDesktop, bounds : Cell) -> windows.Geometry {
+cell_geometry :: proc(vd : ^VirtualDesktop, bounds : Cell) -> util.Geometry {
     // Position of window
     x, y : i16
 
@@ -110,19 +108,20 @@ cell_geometry :: proc(vd : ^VirtualDesktop, bounds : Cell) -> windows.Geometry {
     for i in 0 ..< bounds.height do height +=    row_size(vd, bounds.y + i16(i)) + vd.gap
 
     // Return
-    return windows.Geometry {
+    return util.geometry(
         x = x,
         y = y,
         width  = width  - vd.gap,
         height = height - vd.gap,
-    }
+        border_width = 0,
+    )
 }
 
 // Places a window within the grid of the virtual desktop
-cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) -> Maybe(errors.X11Error) {
+cell_place_window :: proc(vd : ^VirtualDesktop, wid : xcb.Window, bounds : Cell) -> Maybe(wm.X11Error) {
     // Geometry of window
     // TODO respect window size requests
-    border_width := (windows.get_geometry(s, wid) or_return).border_width
+    border_width := (windows.get_geometry(wid) or_return).border_width
     geometry     := cell_geometry(vd, bounds)
     geometry.x   += -vd.scroll_x + i16(vd.padding.left)
     geometry.y   += -vd.scroll_y + i16(vd.padding.top)
@@ -132,9 +131,9 @@ cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
         // Start from center of geometry
         // TODO resizing while mapped costs a lot of time
 
-        xcb.configure_window(conn, wid, xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT, &[2]u32{1, 1})
-        xcb.change_save_set(conn, xcb.SET_MODE_INSERT, wid)
-        xcb.reparent_window(conn, wid, vd.viewport,
+        xcb.configure_window(wm.connection, wid, xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT, &[2]u32{1, 1})
+        xcb.change_save_set(wm.connection, xcb.SET_MODE_INSERT, wid)
+        xcb.reparent_window(wm.connection, wid, vd.viewport,
             geometry.x + i16(geometry.width  / 2) - i16(geometry.border_width),
             geometry.y + i16(geometry.height / 2) - i16(geometry.border_width),
         )
@@ -144,7 +143,7 @@ cell_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
     geometry.height  -= 2 * border_width
     geometry.border_width = border_width
 
-    wm.animate_to(s, geometry, 15, 1, wid) or_return
+    windows.animate_to(geometry, 15, 1, wid) or_return
 
     remove_window(vd, wid)
     vd.grid_windows[wid] = bounds

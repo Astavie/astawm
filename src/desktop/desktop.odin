@@ -2,8 +2,8 @@ package desktop
 
 import "../vendor/xcb"
 import "../wm"
-import "../wm/errors"
 import "../windows"
+import "../util"
 
 import "core:slice"
 
@@ -63,14 +63,14 @@ CELLS_PADDING :: Padding {
 }
 
 // Create virtual desktop
-create :: proc(using s : ^wm.WindowManager, geometry : windows.Geometry) -> (vd : ^VirtualDesktop, e : Maybe(errors.X11Error)) {
+create :: proc(screen : ^xcb.Screen, geometry : util.Geometry) -> (vd : ^VirtualDesktop, e : Maybe(wm.X11Error)) {
 
-    viewport := xcb.generate_id(conn)
+    viewport := xcb.generate_id(wm.connection)
 
-    errors.check_cookie(
-        conn,
+    wm.check_cookie(
+        wm.connection,
         xcb.create_window_checked(
-            conn, screen.root_depth, viewport, screen.root,
+            wm.connection, screen.root_depth, viewport, screen.root,
             geometry.x, geometry.y, geometry.width, geometry.height, geometry.border_width,
             xcb.WINDOW_CLASS_INPUT_OUTPUT, screen.root_visual,
             xcb.CW_EVENT_MASK, &[1]u32{xcb.EVENT_MASK_SUBSTRUCTURE_REDIRECT | xcb.EVENT_MASK_SUBSTRUCTURE_NOTIFY},
@@ -78,15 +78,15 @@ create :: proc(using s : ^wm.WindowManager, geometry : windows.Geometry) -> (vd 
         "Could not create viewport window\n",
     ) or_return
 
-    errors.check_cookie(
-        conn,
-        xcb.change_window_attributes_checked(conn, viewport, xcb.CW_BACK_PIXEL, &[1]u32{0x0000FF}),
+    wm.check_cookie(
+        wm.connection,
+        xcb.change_window_attributes_checked(wm.connection, viewport, xcb.CW_BACK_PIXEL, &[1]u32{0x0000FF}),
         "Could not change attributes of viewport window\n",
     ) or_return
 
-    errors.check_cookie(
-        conn,
-        xcb.map_window_checked(conn, viewport),
+    wm.check_cookie(
+        wm.connection,
+        xcb.map_window_checked(wm.connection, viewport),
         "Could not map viewport window to screen\n",
     ) or_return
 
@@ -113,8 +113,8 @@ create :: proc(using s : ^wm.WindowManager, geometry : windows.Geometry) -> (vd 
 }
 
 // Delete desktop
-destroy :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop) {
-    xcb.destroy_window(conn, vd.viewport)
+destroy :: proc(vd : ^VirtualDesktop) {
+    xcb.destroy_window(wm.connection, vd.viewport)
 
     delete(vd.grid_windows)
     delete(vd.floating_windows)

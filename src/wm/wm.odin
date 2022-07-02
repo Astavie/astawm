@@ -3,46 +3,30 @@ package wm
 import "../vendor/xcb"
 
 import "core:fmt"
-import "core:sync"
 
-WindowManager :: struct {
-    conn : ^xcb.Connection,
-    screen : ^xcb.Screen,
-
-    // Animation info, should not be accessed outside this package
-
-    animation_mutex : sync.Recursive_Mutex,
-    animations : map[xcb.Window][dynamic]Animation,
-    
-    // NOTE: if it seems animations desync window geometries over time, it might be best to also keep track of the desired final geometry
-
-    // ATOMS
-
-    _NET_WM_NAME : xcb.Atom,
-}
+connection : ^xcb.Connection
 
 // Connect to the X server
-connect :: proc() -> (^WindowManager, bool) {
-    using s := new(WindowManager)
-    animations = make(map[xcb.Window][dynamic]Animation)
+connect :: proc() -> bool {
+    connection = xcb.connect(nil, nil)
 
-    screen_index : i32 = ---
-    conn = xcb.connect(nil, &screen_index)
-
-    if conn == nil || xcb.connection_has_error(conn) != 0 {
-        xcb.disconnect(conn)
+    if connection == nil || xcb.connection_has_error(connection) != 0 {
+        disconnect()
         fmt.print("Could not connect to the X server\n")
-        return nil, false
+        return false
     }
 
-    screen = xcb.setup_roots_iterator(xcb.get_setup(conn)).data
+    if err, ok := atoms_init().?; ok {
+        disconnect()
+        fmt.print("Could not load atoms\n")
+        return false
+    }
 
-    return s, true
+    return true
 }
 
 // Disconnect from the X server
-disconnect :: proc(using s : ^WindowManager) {
-    xcb.disconnect(conn)
-    delete(animations)
-    free(s)
+disconnect :: proc() {
+    xcb.disconnect(connection)
+    connection = nil
 }

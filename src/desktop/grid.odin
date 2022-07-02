@@ -1,12 +1,11 @@
 package desktop
 
 import "../vendor/xcb"
-import "../wm/errors"
 import "../windows"
 import "../wm"
 
 // Place a new window opened by the user in the grid
-grid_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid : xcb.Window, width, height : u16) -> Maybe(errors.X11Error) {
+grid_place_window :: proc(vd : ^VirtualDesktop, wid : xcb.Window, width, height : u16) -> Maybe(wm.X11Error) {
     start_x, start_y := cell_at(vd, vd.scroll_x, vd.scroll_y)
 
     start := Cell {
@@ -26,14 +25,14 @@ grid_place_window :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, wid
         height = 2,
     }) { bounds.height = 2 }
 
-    cell_place_window(s, vd, wid, bounds) or_return
-    grid_scroll_to(s, vd, bounds)
+    cell_place_window(vd, wid, bounds) or_return
+    grid_scroll_to(vd, bounds)
 
     return nil
 }
 
 // Scrolls the grid to a cell
-grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds : Cell) {
+grid_scroll_to :: proc(vd : ^VirtualDesktop, bounds : Cell) {
     // Get scroll target
     view_w := i16(vd.width  - vd.padding.left - vd.padding.right)
     view_h := i16(vd.height - vd.padding.top  - vd.padding.bottom)
@@ -52,13 +51,13 @@ grid_scroll_to :: proc(using s : ^wm.WindowManager, vd : ^VirtualDesktop, bounds
     if x == vd.scroll_x && y == vd.scroll_y do return
 
     // Setup scrolling
-    change := wm.GeometryChange {
+    change := windows.GeometryChange {
         x = -(x - vd.scroll_x),
         y = -(y - vd.scroll_y),
     }
 
     for wid in get_windows(vd) {
-        wm.animate_change(s, change, 15, 0, wid)
+        windows.animate_change(change, 15, 0, wid)
     }
 
     vd.scroll_x = x
