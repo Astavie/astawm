@@ -68,7 +68,6 @@ create :: proc(screen : ^xcb.Screen, geometry : util.Geometry) -> (vd : ^Virtual
     viewport := xcb.generate_id(wm.connection)
 
     wm.check_cookie(
-        wm.connection,
         xcb.create_window_checked(
             wm.connection, screen.root_depth, viewport, screen.root,
             geometry.x, geometry.y, geometry.width, geometry.height, geometry.border_width,
@@ -79,13 +78,11 @@ create :: proc(screen : ^xcb.Screen, geometry : util.Geometry) -> (vd : ^Virtual
     ) or_return
 
     wm.check_cookie(
-        wm.connection,
         xcb.change_window_attributes_checked(wm.connection, viewport, xcb.CW_BACK_PIXEL, &[1]u32{0x0000FF}),
         "Could not change attributes of viewport window\n",
     ) or_return
 
     wm.check_cookie(
-        wm.connection,
         xcb.map_window_checked(wm.connection, viewport),
         "Could not map viewport window to screen\n",
     ) or_return

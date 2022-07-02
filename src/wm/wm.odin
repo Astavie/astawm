@@ -16,7 +16,7 @@ connect :: proc() -> bool {
         return false
     }
 
-    if err, ok := atoms_init().?; ok {
+    if _, ok := atoms_init().?; ok {
         disconnect()
         fmt.print("Could not load atoms\n")
         return false

@@ -24,7 +24,7 @@ gain_control :: proc(wid : xcb.Window) -> Maybe(wm.X11Error) {
     mask := xcb.EVENT_MASK_SUBSTRUCTURE_REDIRECT | xcb.EVENT_MASK_SUBSTRUCTURE_NOTIFY
     cookie := xcb.change_window_attributes_checked(wm.connection, wid, xcb.CW_EVENT_MASK, &mask)
 
-    wm.check_cookie(wm.connection, cookie, "Could not gain control of window %d\n", wid) or_return
+    wm.check_cookie(cookie, "Could not gain control of window %d\n", wid) or_return
     return nil
 }
 
