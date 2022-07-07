@@ -1,9 +1,6 @@
 package util
 
-Pos :: struct {
-    x : i16,
-    y : i16,
-}
+Pos :: distinct [2]i16
 
 Size :: struct {
     width : u16,

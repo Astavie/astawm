@@ -1,0 +1,251 @@
+package layout
+
+import "../util"
+import "core:builtin"
+
+Series :: enum {
+    ROW, COLUMN,
+}
+
+SingleLayout :: struct{}
+
+Gaps :: struct {
+    padding_left, padding_top, padding_right, padding_bottom, gap_between : u16,
+}
+
+SeriesLayout :: struct {
+    using gaps : Gaps,
+    max : u16, // 0 means infinite
+    type : Series,
+    reverse : bool,
+}
+
+MetaLayout :: struct {
+    outer : ^Layout,
+    inner : ^Layout,
+    spread : bool,
+}
+
+LayoutData :: struct {
+    amount : u16,
+
+    // used in MetaLayout and DistributeLayout
+    outer : ^LayoutData,
+    inner : [dynamic]LayoutData,
+}
+
+Layout :: union #no_nil {
+    SingleLayout,
+    SeriesLayout,
+    MetaLayout,
+}
+
+delete :: proc(data : LayoutData) {
+    if data.outer != nil {
+        delete(data.outer^)
+        free(data.outer)
+    }
+
+    for inner in data.inner do delete(inner)
+    builtin.delete(data.inner)
+}
+
+is_finite :: proc(layout : Layout) -> bool {
+    switch l in layout {
+    case SingleLayout:
+        return true
+    case SeriesLayout:
+        return l.max > 0
+    case MetaLayout:
+        return is_finite(l.inner^ if l.spread else l.outer^)
+    case:
+        panic("undefined layout")
+    }
+}
+
+insert_first :: proc(layout : Layout, data : ^LayoutData) -> bool {
+    switch l in layout {
+    case SingleLayout:
+        if data.amount == 0 {
+            data.amount = 1
+            return true
+        }
+    case SeriesLayout:
+        if l.max == 0 || data.amount < l.max {
+            data.amount += 1
+            return true
+        }
+    case MetaLayout:
+        if data.outer == nil {
+            data.outer = new(LayoutData)
+            assert(insert_first(l.outer^, data.outer))
+
+            data.inner = {{}} // lol
+            assert(insert_first(l.inner^, &data.inner[0]))
+
+            data.amount = 1
+            return true
+        } else if insert_first(l.inner^, &data.inner[0]) {
+            data.amount += 1
+            return true
+        }
+    case:
+        panic("undefined layout")
+    }
+
+    return false
+}
+
+insert_after :: proc(layout : Layout, data : ^LayoutData, idx : u16) -> (u16, bool) {
+
+    assert(idx <= data.amount)
+
+    switch l in layout {
+    case SingleLayout:
+    case SeriesLayout:
+        if l.max == 0 || data.amount < l.max {
+            data.amount += 1
+            return idx + 1, true
+        }
+    case MetaLayout:
+        length := u16(len(data.inner))
+
+        // get sub-index
+        index : u16 = 0
+        offset : u16 = 0
+
+        for index < length - 1 && idx >= offset + data.inner[index].amount {
+            offset += data.inner[index].amount
+            index += 1
+        }
+
+        if l.spread {
+            // add new sub-layout
+            if outer_index, ok := insert_after(l.outer^, data.outer, index); ok {
+                insert_at(&data.inner, int(outer_index), LayoutData{})
+                assert(insert_first(l.inner^, &data.inner[outer_index]))
+
+                data.amount += 1
+                return offset + data.inner[index].amount, true
+            }
+
+            // get next index
+            subindex := idx - offset
+
+            offset += data.inner[index].amount
+            index += 1
+            
+            if index == length {
+                offset = 0
+                index = 0
+                subindex += 1
+            }
+
+            // add to sub-layout
+            if (subindex == 0) {
+                if (insert_first(l.inner^, &data.inner[index])) {
+                    data.amount += 1
+                    return offset, true
+                }
+            } else {
+                subindex = min(subindex, data.inner[index].amount)
+                if inner_index, ok := insert_after(l.inner^, &data.inner[index], subindex - 1); ok {
+                    data.amount += 1
+                    return offset + inner_index, true
+                }
+            }
+        } else {
+            // add to sub-layout
+            if inner_index, ok := insert_after(l.inner^, &data.inner[index], idx - offset); ok {
+                data.amount += 1
+                return offset + inner_index, true
+            }
+    
+            // add new sub-layout
+            if outer_index, ok := insert_after(l.outer^, data.outer, index); ok {
+                insert_at(&data.inner, int(outer_index), LayoutData{})
+                assert(insert_first(l.inner^, &data.inner[outer_index]))
+
+                data.amount += 1
+                return offset + data.inner[index].amount, true
+            }
+        }
+    case:
+        panic("undefined layout")
+    }
+
+    return ---, false
+}
+
+calc_inner_layout :: proc(layout : Layout, data : LayoutData, using desktop_size : util.Size, amount_override : u16 = 0) -> []util.Rect {
+
+    // prevent division by 0
+    if data.amount == 0 do return {}
+
+    overshoot := amount_override
+    if overshoot < data.amount do overshoot = data.amount
+
+    rects := make([]util.Rect, data.amount)
+
+    switch l in layout {
+    case SingleLayout:
+        // single window filling the entire screen
+        rects[0] = util.Rect { { 0, 0 }, desktop_size }
+
+    case SeriesLayout:
+        // row or column of windows
+        inner_width  := width  - l.padding_left - l.padding_right
+        inner_height := height - l.padding_top  - l.padding_bottom
+
+        switch l.type {
+        case .ROW:
+            inner_width = (inner_width + l.gap_between) / overshoot - l.gap_between
+            for i in 0..<data.amount {
+                j := data.amount - 1 - i if l.reverse else i
+                rects[i] = util.rect(
+                    i16(l.padding_left) + i16(inner_width + l.gap_between) * i16(j),
+                    i16(l.padding_top),
+                    inner_width,
+                    inner_height,
+                )
+            }
+        case .COLUMN:
+            inner_height = (inner_height + l.gap_between) / overshoot - l.gap_between
+            for i in 0..<data.amount {
+                j := data.amount - 1 - i if l.reverse else i
+                rects[i] = util.rect(
+                    i16(l.padding_left),
+                    i16(l.padding_top) + i16(inner_height + l.gap_between) * i16(j),
+                    inner_width,
+                    inner_height,
+                )
+            }
+        }
+        
+    case MetaLayout:
+        // layout of layouts
+        overshoot = (overshoot * data.outer.amount - 1) / data.amount + 1
+        outer_rects := calc_inner_layout(l.outer^, data.outer^, desktop_size, overshoot)
+
+        i := 0
+
+        for outer_rect, idx in outer_rects {
+            count := data.inner[idx].amount
+            inner_rects := calc_inner_layout(l.inner^, data.inner[idx], outer_rect.size)
+
+            for inner_rect in inner_rects {
+                rects[i] = util.Rect {
+                    outer_rect.pos + inner_rect.pos,
+                    inner_rect.size,
+                }
+                i += 1
+            }
+        }
+
+    case:
+        panic("undefined layout")
+    }
+
+    return rects
+
+}
