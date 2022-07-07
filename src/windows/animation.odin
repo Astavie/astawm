@@ -108,8 +108,8 @@ configure_window_discard :: proc(change : GeometryChange, wid : xcb.Window) {
         wm.connection, wid,
         xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y | xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT | xcb.CONFIG_WINDOW_BORDER_WIDTH,
         &[5]u32{
-            transmute(u32) i32(reply.x + change.x),
-            transmute(u32) i32(reply.y + change.y),
+            u32(transmute(u16) (reply.x + change.x)),
+            u32(transmute(u16) (reply.y + change.y)),
             u32(i16(reply.width) + change.width),
             u32(i16(reply.height) + change.height),
             u32(i16(reply.border_width) + change.border_width),

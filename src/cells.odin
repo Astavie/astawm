@@ -3,7 +3,7 @@ package main
 import "vendor/xcb"
 import "vendor/xcb_errors"
 import "windows"
-import "desktop"
+import "layout"
 import "wm"
 import "util"
 
@@ -13,8 +13,36 @@ import "core:slice"
 import "core:thread"
 import "core:time"
 
+refresh_layout :: proc(clients : []xcb.Window, lyt : layout.Layout, data : layout.LayoutData, size : util.Size, new : Maybe(xcb.Window) = nil) -> Maybe(wm.X11Error) {
+
+    for rect, idx in layout.calc_inner_layout(lyt, data, size) {
+        if clients[idx] == new {
+            xcb.configure_window(wm.connection, clients[idx], 31, &[5]u32{
+                u32(transmute(u16) rect.x),
+                u32(transmute(u16) rect.y),
+                u32(rect.width),
+                u32(rect.height),
+                0,
+            })
+        } else {
+            windows.animate_to({ rect, 0 }, 15, 1, clients[idx]) or_return
+        }
+    }
+
+    return nil
+
+}
+
 // Main loop
 cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
+
+    // Create layout
+    lyt := cast(layout.Layout) layout.MetaLayout {
+        &cast(layout.Layout) layout.SeriesLayout { {8, 8, 8, 8}, 8, 0, layout.Series.COLUMN, false },
+        &cast(layout.Layout) layout.SeriesLayout { {},           8, 2, layout.Series.ROW,    false },
+    }
+    data : layout.LayoutData
+    
     // Get screen
     screen := xcb.setup_roots_iterator(xcb.get_setup(wm.connection)).data
     windows.gain_control(screen.root) or_return
@@ -22,31 +50,27 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
     // Get all top-level windows
     children := windows.get_children(screen.root) or_return
 
-    // Create virtual desktop
-    vd := desktop.create(screen, util.geometry(
-        x = i16(screen.width_in_pixels / 2),
-        y = 0,
-        width = screen.width_in_pixels / 2,
-        height = screen.height_in_pixels,
-        border_width = 0,
-    )) or_return
-
-    defer desktop.destroy(vd)
+    clients_mapped := make([dynamic]xcb.Window, 0, len(children))
+    clients_stack  := make([dynamic]xcb.Window, 0, len(children))
 
     for child in children {
-        // Place window within the virtual desktop
         if !windows.can_manipulate(child) or_return do continue
 
-        // TODO: check if window should be tiled or should stay floating
-        wm.print_maybe(
-            ctx,
-            desktop.grid_place_window(vd, child, 1, 1),
-        )
+        // add client to managed windows
+        append(&clients_mapped, child)
+        append(&clients_stack, child)
+
+        ok := layout.insert_last(lyt, &data)
+        if !ok do panic("could not fit window into layout")
     }
 
     delete(children)
 
-    // flush commands
+    // refresh
+    wm.print_maybe(
+        ctx,
+        refresh_layout(clients_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }),
+    )
     xcb.flush(wm.connection)
 
     // event loop
@@ -73,10 +97,21 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
 
             case xcb.MAP_REQUEST:
                 mre := cast(^xcb.MapRequestEvent) event
+
+                // add client to managed windows
+                append(&clients_mapped, mre.window)
+                append(&clients_stack, mre.window)
+        
+                ok := layout.insert_last(lyt, &data)
+                if !ok do panic("could not fit window into layout")
+
+                // refresh
                 wm.print_maybe(
                     ctx,
-                    desktop.grid_place_window(vd, mre.window, 1, 1),
+                    refresh_layout(clients_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }, mre.window),
                 )
+
+                // map client
                 xcb.map_window(wm.connection, mre.window)
                 xcb.flush(wm.connection)
 
@@ -88,11 +123,11 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
                 i : uint = 0
         
                 if cre.value_mask & xcb.CONFIG_WINDOW_X != 0 {
-                    fields[i] = transmute(u32) i32(cre.x)
+                    fields[i] = u32(transmute(u16) cre.x)
                     i += 1
                 }
                 if cre.value_mask & xcb.CONFIG_WINDOW_Y != 0 {
-                    fields[i] = transmute(u32) i32(cre.y)
+                    fields[i] = u32(transmute(u16) cre.y)
                     i += 1
                 }
                 if cre.value_mask & xcb.CONFIG_WINDOW_WIDTH != 0 {
@@ -127,7 +162,7 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
                 if umn.event == screen.root do break
 
                 // Remove window from virtual desktop
-                desktop.remove_window(vd, umn.window)
+                // desktop.remove_window(vd, umn.window) // TODO
                 xcb.flush(wm.connection)
         }
     }

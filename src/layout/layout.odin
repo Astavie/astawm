@@ -90,6 +90,51 @@ insert_first :: proc(layout : Layout, data : ^LayoutData) -> bool {
         } else if insert_first(l.inner^, &data.inner[0]) {
             data.amount += 1
             return true
+        } else if insert_first(l.outer^, data.outer) {
+            insert_at(&data.inner, 0, LayoutData{})
+            assert(insert_first(l.inner^, &data.inner[0]))
+
+            data.amount += 1
+            return true
+        }
+    case:
+        panic("undefined layout")
+    }
+
+    return false
+}
+
+insert_last :: proc(layout : Layout, data : ^LayoutData) -> bool {
+    switch l in layout {
+    case SingleLayout:
+        if data.amount == 0 {
+            data.amount = 1
+            return true
+        }
+    case SeriesLayout:
+        if l.max == 0 || data.amount < l.max {
+            data.amount += 1
+            return true
+        }
+    case MetaLayout:
+        if data.outer == nil {
+            data.outer = new(LayoutData)
+            assert(insert_first(l.outer^, data.outer))
+
+            data.inner = {{}} // lol
+            assert(insert_first(l.inner^, &data.inner[0]))
+
+            data.amount = 1
+            return true
+        } else if insert_last(l.inner^, &data.inner[len(data.inner) - 1]) {
+            data.amount += 1
+            return true
+        } else if insert_last(l.outer^, data.outer) {
+            append(&data.inner, LayoutData{})
+            assert(insert_last(l.inner^, &data.inner[len(data.inner) - 1]))
+
+            data.amount += 1
+            return true
         }
     case:
         panic("undefined layout")
