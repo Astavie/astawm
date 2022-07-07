@@ -4,8 +4,8 @@ import "core:fmt"
 
 main :: proc() {
     layout := cast(Layout) MetaLayout {
-        &cast(Layout) SeriesLayout { {}, 2, Series.ROW,    false  },
-        &cast(Layout) SeriesLayout { {}, 0, Series.COLUMN, true },
+        &cast(Layout) SeriesLayout { {}, 0, 2, Series.ROW,    false  },
+        &cast(Layout) SeriesLayout { {}, 0, 0, Series.COLUMN, true },
     }
 
     data : LayoutData

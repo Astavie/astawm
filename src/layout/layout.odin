@@ -7,14 +7,17 @@ Series :: enum {
     ROW, COLUMN,
 }
 
-SingleLayout :: struct{}
+SingleLayout :: struct {
+    using padding : Padding,
+}
 
-Gaps :: struct {
-    padding_left, padding_top, padding_right, padding_bottom, gap_between : u16,
+Padding :: struct {
+    padding_left, padding_top, padding_right, padding_bottom : u16,
 }
 
 SeriesLayout :: struct {
-    using gaps : Gaps,
+    using padding : Padding,
+    gap_between : u16,
     max : u16, // 0 means infinite
     type : Series,
     reverse : bool,
@@ -155,7 +158,12 @@ calc_inner_layout :: proc(layout : Layout, data : LayoutData, using desktop_size
     switch l in layout {
     case SingleLayout:
         // single window filling the entire screen
-        rects[0] = util.Rect { { 0, 0 }, desktop_size }
+        rects[0] = util.rect(
+            i16(l.padding_left),
+            i16(l.padding_top),
+            width  - l.padding_left - l.padding_right,
+            height - l.padding_top  - l.padding_bottom,
+        )
 
     case SeriesLayout:
         // row or column of windows
