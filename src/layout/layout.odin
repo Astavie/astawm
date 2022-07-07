@@ -23,7 +23,6 @@ SeriesLayout :: struct {
 MetaLayout :: struct {
     outer : ^Layout,
     inner : ^Layout,
-    spread : bool,
 }
 
 LayoutData :: struct {
@@ -57,7 +56,7 @@ is_finite :: proc(layout : Layout) -> bool {
     case SeriesLayout:
         return l.max > 0
     case MetaLayout:
-        return is_finite(l.inner^ if l.spread else l.outer^)
+        return is_finite(l.outer^) && is_finite(l.inner^)
     case:
         panic("undefined layout")
     }
@@ -119,56 +118,22 @@ insert_after :: proc(layout : Layout, data : ^LayoutData, idx : u16) -> (u16, bo
             index += 1
         }
 
-        if l.spread {
-            // add new sub-layout
-            if outer_index, ok := insert_after(l.outer^, data.outer, index); ok {
-                insert_at(&data.inner, int(outer_index), LayoutData{})
-                assert(insert_first(l.inner^, &data.inner[outer_index]))
+        // add to sub-layout
+        if inner_index, ok := insert_after(l.inner^, &data.inner[index], idx - offset); ok {
+            data.amount += 1
+            return offset + inner_index, true
+        }
 
-                data.amount += 1
-                return offset + data.inner[index].amount, true
-            }
+        // add new sub-layout
+        if outer_index, ok := insert_after(l.outer^, data.outer, index); ok {
+            insert_at(&data.inner, int(outer_index), LayoutData{})
+            assert(insert_first(l.inner^, &data.inner[outer_index]))
 
-            // get next index
-            subindex := idx - offset
+            offset = 0
+            for d in data.inner[:outer_index] do offset += d.amount
 
-            offset += data.inner[index].amount
-            index += 1
-            
-            if index == length {
-                offset = 0
-                index = 0
-                subindex += 1
-            }
-
-            // add to sub-layout
-            if (subindex == 0) {
-                if (insert_first(l.inner^, &data.inner[index])) {
-                    data.amount += 1
-                    return offset, true
-                }
-            } else {
-                subindex = min(subindex, data.inner[index].amount)
-                if inner_index, ok := insert_after(l.inner^, &data.inner[index], subindex - 1); ok {
-                    data.amount += 1
-                    return offset + inner_index, true
-                }
-            }
-        } else {
-            // add to sub-layout
-            if inner_index, ok := insert_after(l.inner^, &data.inner[index], idx - offset); ok {
-                data.amount += 1
-                return offset + inner_index, true
-            }
-    
-            // add new sub-layout
-            if outer_index, ok := insert_after(l.outer^, data.outer, index); ok {
-                insert_at(&data.inner, int(outer_index), LayoutData{})
-                assert(insert_first(l.inner^, &data.inner[outer_index]))
-
-                data.amount += 1
-                return offset + data.inner[index].amount, true
-            }
+            data.amount += 1
+            return offset, true
         }
     case:
         panic("undefined layout")
