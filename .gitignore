@@ -1,5 +1,5 @@
 # binary
-.bin
+*.bin
 
 # language server
 ols.json
