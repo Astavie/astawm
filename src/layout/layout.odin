@@ -209,8 +209,7 @@ calc_inner_layout :: proc(layout : Layout, data : LayoutData, using desktop_size
     // prevent division by 0
     if data.amount == 0 do return {}
 
-    overshoot := amount_override
-    if overshoot < data.amount do overshoot = data.amount
+    overshoot := max(data.amount, amount_override)
 
     rects := make([]util.Rect, data.amount)
 
