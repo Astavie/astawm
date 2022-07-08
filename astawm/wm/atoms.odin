@@ -1,16 +1,21 @@
 package wm
 
-import "../vendor/xcb"
+import "../../vendor/xcb"
 
 import "core:strings"
 import "core:c/libc"
 
-_NET_WM_NAME : xcb.Atom
+_NET_WM_NAME,
+
+ASTA_PRINT : xcb.Atom
 
 // Looks up and saves atom variables
 @private
 atoms_init :: proc() -> Maybe(X11Error) {
     _NET_WM_NAME = lookup("_NET_WM_NAME") or_return
+
+    ASTA_PRINT = lookup("ASTA_PRINT") or_return
+
     return nil
 }
 

@@ -1,6 +1,6 @@
 package wm
 
-import "../vendor/xcb"
+import "../../vendor/xcb"
 
 import "core:fmt"
 

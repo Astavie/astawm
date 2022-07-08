@@ -1,6 +1,6 @@
 package windows
 
-import "../vendor/xcb"
+import "../../vendor/xcb"
 import "../wm"
 
 import "core:c/libc"

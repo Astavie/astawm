@@ -1,7 +1,7 @@
 package main
 
-import "vendor/xcb"
-import "vendor/xcb_errors"
+import "../vendor/xcb"
+import "../vendor/xcb_errors"
 import "windows"
 import "layout"
 import "wm"
@@ -12,6 +12,7 @@ import "core:c/libc"
 import "core:slice"
 import "core:thread"
 import "core:time"
+import "core:strings"
 
 refresh_layout :: proc(clients : []xcb.Window, lyt : layout.Layout, data : layout.LayoutData, size : util.Size, new : Maybe(xcb.Window) = nil) -> Maybe(wm.X11Error) {
 
@@ -88,12 +89,20 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
 
         defer libc.free(event)
 
-        switch event.response_type {
+        switch event.response_type & 0x7f {
             case 0:
                 wm.print(
                     ctx,
                     wm.convert(cast(^xcb.GenericError) event),
                 )
+
+            case xcb.CLIENT_MESSAGE:
+                cme := cast(^xcb.ClientMessageEvent) event
+                
+                if cme.type == wm.ASTA_PRINT {
+                    str := strings.string_from_nul_terminated_ptr(&cme.data.data8[0], 20)
+                    fmt.println(str)
+                }
 
             case xcb.MAP_REQUEST:
                 mre := cast(^xcb.MapRequestEvent) event
