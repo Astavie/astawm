@@ -161,6 +161,11 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
                 if idx, ok := slice.linear_search(clients_stack[:], umn.window); ok {
                     layout.remove(lyt, &data, u16(idx))
                     ordered_remove(&clients_stack, idx)
+
+                    map_idx, ok := slice.linear_search(clients_mapped[:], umn.window)
+                    if !ok do panic("window is in stack-ordered array but not map-ordered array")
+                    ordered_remove(&clients_mapped, map_idx)
+
                     refresh_layout(clients_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels })
                     xcb.flush(wm.connection)
                 }
