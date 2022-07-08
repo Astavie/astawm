@@ -171,13 +171,11 @@ insert_after :: proc(layout : Layout, data : ^LayoutData, idx : u16) -> (u16, bo
             return idx + 1, true
         }
     case MetaLayout:
-        length := u16(len(data.inner))
-
         // get sub-index
         index : u16 = 0
         offset : u16 = 0
 
-        for index < length - 1 && idx >= offset + data.inner[index].amount {
+        for idx >= offset + data.inner[index].amount {
             offset += data.inner[index].amount
             index += 1
         }
