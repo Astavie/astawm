@@ -115,46 +115,6 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
                 xcb.map_window(wm.connection, mre.window)
                 xcb.flush(wm.connection)
 
-            case xcb.CONFIGURE_REQUEST:
-                cre := cast(^xcb.ConfigureRequestEvent) event
-
-                // Copy fields
-                fields : [7]u32 = ---
-                i : uint = 0
-        
-                if cre.value_mask & xcb.CONFIG_WINDOW_X != 0 {
-                    fields[i] = u32(transmute(u16) cre.x)
-                    i += 1
-                }
-                if cre.value_mask & xcb.CONFIG_WINDOW_Y != 0 {
-                    fields[i] = u32(transmute(u16) cre.y)
-                    i += 1
-                }
-                if cre.value_mask & xcb.CONFIG_WINDOW_WIDTH != 0 {
-                    fields[i] = u32(cre.width)
-                    i += 1
-                }
-                if cre.value_mask & xcb.CONFIG_WINDOW_HEIGHT != 0 {
-                    fields[i] = u32(cre.height)
-                    i += 1
-                }
-                if cre.value_mask & xcb.CONFIG_WINDOW_BORDER_WIDTH != 0 {
-                    fields[i] = u32(cre.border_width)
-                    i += 1
-                }
-                if cre.value_mask & xcb.CONFIG_WINDOW_SIBLING != 0 {
-                    fields[i] = u32(cre.sibling)
-                    i += 1
-                }
-                if cre.value_mask & xcb.CONFIG_WINDOW_STACK_MODE != 0 {
-                    fields[i] = u32(cre.stack_mode)
-                    i += 1
-                }
-        
-                // Forward the request
-                xcb.configure_window(wm.connection, cre.window, cre.value_mask, &fields)
-                xcb.flush(wm.connection)
-
             case xcb.UNMAP_NOTIFY:
                 umn := cast(^xcb.UnmapNotifyEvent) event
 
