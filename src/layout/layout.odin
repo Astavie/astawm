@@ -65,6 +65,36 @@ is_finite :: proc(layout : Layout) -> bool {
     }
 }
 
+remove :: proc(layout : Layout, data : ^LayoutData, idx : u16) {
+    data.amount -= 1
+
+    switch l in layout {
+    case SingleLayout:
+    case SeriesLayout:
+    case MetaLayout:
+        // get sub-index
+        index : u16 = 0
+        offset : u16 = 0
+
+        for idx >= offset + data.inner[index].amount {
+            offset += data.inner[index].amount
+            index += 1
+        }
+
+        // remove
+        remove(l.inner^, &data.inner[index], idx - offset)
+        
+        if data.inner[index].amount == 0 {
+            delete(data.inner[index])
+            ordered_remove(&data.inner, int(index))
+
+            remove(l.outer^, data.outer, index)
+        }
+    case:
+        panic("undefined layout")
+    }
+}
+
 insert_first :: proc(layout : Layout, data : ^LayoutData) -> bool {
     switch l in layout {
     case SingleLayout:
@@ -78,16 +108,9 @@ insert_first :: proc(layout : Layout, data : ^LayoutData) -> bool {
             return true
         }
     case MetaLayout:
-        if data.outer == nil {
-            data.outer = new(LayoutData)
-            assert(insert_first(l.outer^, data.outer))
+        if data.outer == nil do data.outer = new(LayoutData)
 
-            data.inner = {{}} // lol
-            assert(insert_first(l.inner^, &data.inner[0]))
-
-            data.amount = 1
-            return true
-        } else if insert_first(l.inner^, &data.inner[0]) {
+        if len(data.inner) > 0 && insert_first(l.inner^, &data.inner[0]) {
             data.amount += 1
             return true
         } else if insert_first(l.outer^, data.outer) {
@@ -117,16 +140,9 @@ insert_last :: proc(layout : Layout, data : ^LayoutData) -> bool {
             return true
         }
     case MetaLayout:
-        if data.outer == nil {
-            data.outer = new(LayoutData)
-            assert(insert_first(l.outer^, data.outer))
+        if data.outer == nil do data.outer = new(LayoutData)
 
-            data.inner = {{}} // lol
-            assert(insert_first(l.inner^, &data.inner[0]))
-
-            data.amount = 1
-            return true
-        } else if insert_last(l.inner^, &data.inner[len(data.inner) - 1]) {
+        if len(data.inner) > 0 && insert_last(l.inner^, &data.inner[len(data.inner) - 1]) {
             data.amount += 1
             return true
         } else if insert_last(l.outer^, data.outer) {

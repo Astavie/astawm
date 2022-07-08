@@ -158,12 +158,12 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
             case xcb.UNMAP_NOTIFY:
                 umn := cast(^xcb.UnmapNotifyEvent) event
 
-                // Ignore if triggered by reparenting
-                if umn.event == screen.root do break
-
-                // Remove window from virtual desktop
-                // desktop.remove_window(vd, umn.window) // TODO
-                xcb.flush(wm.connection)
+                if idx, ok := slice.linear_search(clients_stack[:], umn.window); ok {
+                    layout.remove(lyt, &data, u16(idx))
+                    ordered_remove(&clients_stack, idx)
+                    refresh_layout(clients_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels })
+                    xcb.flush(wm.connection)
+                }
         }
     }
 
