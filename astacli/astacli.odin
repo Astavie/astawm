@@ -27,7 +27,7 @@ main :: proc() {
     err : ^xcb.GenericError = ---
     reply := xcb.intern_atom_reply(conn, cookie, &err)
 
-    if err != nil do panic("could not get atom")
+    if err != nil do panic("Could not get atom")
 
     ASTA_PRINT := reply.atom
     libc.free(reply)
@@ -43,5 +43,5 @@ main :: proc() {
     }
 
     cookie2 := xcb.send_event_checked(conn, 0, root, xcb.EVENT_MASK_SUBSTRUCTURE_NOTIFY | xcb.EVENT_MASK_SUBSTRUCTURE_REDIRECT, transmute(cstring) &msg)
-    if xcb.request_check(conn, cookie2) != nil do panic("could not send message")
+    if xcb.request_check(conn, cookie2) != nil do panic("Could not send message")
 }

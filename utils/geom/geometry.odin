@@ -1,4 +1,4 @@
-package util
+package geom
 
 Pos :: distinct [2]i16
 

@@ -2,10 +2,10 @@ package main
 
 import "../vendor/xcb"
 import "../vendor/xcb_errors"
+import "../utils/client"
+import "../utils/geom"
 import "windows"
 import "layout"
-import "wm"
-import "util"
 
 import "core:fmt"
 import "core:c/libc"
@@ -14,11 +14,11 @@ import "core:thread"
 import "core:time"
 import "core:strings"
 
-refresh_layout :: proc(clients : []xcb.Window, lyt : layout.Layout, data : layout.LayoutData, size : util.Size, new : Maybe(xcb.Window) = nil) -> Maybe(wm.X11Error) {
+refresh_layout :: proc(wids : []xcb.Window, lyt : layout.Layout, data : layout.LayoutData, size : geom.Size, new : Maybe(xcb.Window) = nil) -> Maybe(client.XError) {
 
     for rect, idx in layout.calc_inner_layout(lyt, data, size) {
-        if clients[idx] == new {
-            xcb.configure_window(wm.connection, clients[idx], 31, &[5]u32{
+        if wids[idx] == new {
+            xcb.configure_window(client.connection, wids[idx], 31, &[5]u32{
                 u32(transmute(u16) rect.x),
                 u32(transmute(u16) rect.y),
                 u32(rect.width),
@@ -26,7 +26,7 @@ refresh_layout :: proc(clients : []xcb.Window, lyt : layout.Layout, data : layou
                 0,
             })
         } else {
-            windows.animate_to({ rect, 0 }, 15, 1, clients[idx]) or_return
+            windows.animate_to({ rect, 0 }, 15, 1, wids[idx]) or_return
         }
     }
 
@@ -35,7 +35,7 @@ refresh_layout :: proc(clients : []xcb.Window, lyt : layout.Layout, data : layou
 }
 
 // Main loop
-cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
+cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(client.XError) {
 
     // Create layout
     lyt := cast(layout.Layout) layout.MetaLayout {
@@ -45,61 +45,61 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
     data : layout.LayoutData
     
     // Get screen
-    screen := xcb.setup_roots_iterator(xcb.get_setup(wm.connection)).data
+    screen := xcb.setup_roots_iterator(xcb.get_setup(client.connection)).data
     windows.gain_control(screen.root) or_return
 
     // Get all top-level windows
     children := windows.get_children(screen.root) or_return
 
-    clients_mapped := make([dynamic]xcb.Window, 0, len(children))
-    clients_stack  := make([dynamic]xcb.Window, 0, len(children))
+    wids_mapped := make([dynamic]xcb.Window, 0, len(children))
+    wids_stack  := make([dynamic]xcb.Window, 0, len(children))
 
     for child in children {
         if !windows.can_manipulate(child) or_return do continue
 
         // add client to managed windows
-        append(&clients_mapped, child)
-        append(&clients_stack, child)
+        append(&wids_mapped, child)
+        append(&wids_stack, child)
 
         ok := layout.insert_last(lyt, &data)
-        if !ok do panic("could not fit window into layout")
+        if !ok do panic("Could not fit window into layout")
     }
 
     delete(children)
 
     // refresh
-    wm.print_maybe(
+    client.print_maybe(
         ctx,
-        refresh_layout(clients_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }),
+        refresh_layout(wids_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }),
     )
-    xcb.flush(wm.connection)
+    xcb.flush(client.connection)
 
     // event loop
     for {
         // Check connection
-        error_code := xcb.connection_has_error(wm.connection)
+        error_code := xcb.connection_has_error(client.connection)
         if error_code != 0 {
             fmt.print("Connection with the X server crashed\n")
             return nil
         }
 
         // Wait for an event
-        event := xcb.wait_for_event(wm.connection)
+        event := xcb.wait_for_event(client.connection)
         if event == nil do continue
 
         defer libc.free(event)
 
         switch event.response_type & 0x7f {
             case 0:
-                wm.print(
+                client.print(
                     ctx,
-                    wm.convert(cast(^xcb.GenericError) event),
+                    client.convert(cast(^xcb.GenericError) event),
                 )
 
             case xcb.CLIENT_MESSAGE:
                 cme := cast(^xcb.ClientMessageEvent) event
                 
-                if cme.type == wm.ASTA_PRINT {
+                if cme.type == client.lookup("ASTA_PRINT") or_return {
                     str := strings.string_from_nul_terminated_ptr(&cme.data.data8[0], 20)
                     fmt.println(str)
                 }
@@ -108,35 +108,35 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
                 mre := cast(^xcb.MapRequestEvent) event
 
                 // add client to managed windows
-                append(&clients_mapped, mre.window)
-                append(&clients_stack, mre.window)
+                append(&wids_mapped, mre.window)
+                append(&wids_stack, mre.window)
         
                 ok := layout.insert_last(lyt, &data)
-                if !ok do panic("could not fit window into layout")
+                if !ok do panic("Could not fit window into layout")
 
                 // refresh
-                wm.print_maybe(
+                client.print_maybe(
                     ctx,
-                    refresh_layout(clients_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }, mre.window),
+                    refresh_layout(wids_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }, mre.window),
                 )
 
                 // map client
-                xcb.map_window(wm.connection, mre.window)
-                xcb.flush(wm.connection)
+                xcb.map_window(client.connection, mre.window)
+                xcb.flush(client.connection)
 
             case xcb.UNMAP_NOTIFY:
                 umn := cast(^xcb.UnmapNotifyEvent) event
 
-                if idx, ok := slice.linear_search(clients_stack[:], umn.window); ok {
+                if idx, ok := slice.linear_search(wids_stack[:], umn.window); ok {
                     layout.remove(lyt, &data, u16(idx))
-                    ordered_remove(&clients_stack, idx)
+                    ordered_remove(&wids_stack, idx)
 
-                    map_idx, ok := slice.linear_search(clients_mapped[:], umn.window)
+                    map_idx, ok := slice.linear_search(wids_mapped[:], umn.window)
                     if !ok do panic("window is in stack-ordered array but not map-ordered array")
-                    ordered_remove(&clients_mapped, map_idx)
+                    ordered_remove(&wids_mapped, map_idx)
 
-                    refresh_layout(clients_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels })
-                    xcb.flush(wm.connection)
+                    refresh_layout(wids_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels })
+                    xcb.flush(client.connection)
                 }
         }
     }
@@ -148,7 +148,7 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(wm.X11Error) {
 animations :: proc(running : ^bool) {
     for running^ {
         windows.update_animations()
-        xcb.flush(wm.connection)
+        xcb.flush(client.connection)
         time.accurate_sleep(time.Second / 60)
     }
 }
@@ -156,12 +156,15 @@ animations :: proc(running : ^bool) {
 // Main function
 main :: proc() {
     // Connect to the X server
-    if !wm.connect() do return
-    defer wm.disconnect()
+    if !client.connect() {
+        fmt.print("Could not connect to the X server\n")
+        return
+    }
+    defer client.disconnect()
 
     // Create xcb error context
     ctx : ^xcb_errors.Context = ---
-    _ = xcb_errors.context_new(wm.connection, &ctx)
+    _ = xcb_errors.context_new(client.connection, &ctx)
     defer xcb_errors.context_free(ctx)
 
     // Run
@@ -169,7 +172,7 @@ main :: proc() {
 
     t := thread.create_and_start_with_poly_data(&running, animations)
 
-    wm.print_maybe(
+    client.print_maybe(
         ctx,
         cells(ctx),
     )

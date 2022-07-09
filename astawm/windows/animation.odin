@@ -1,8 +1,8 @@
 package windows
 
 import "../../vendor/xcb"
-import "../util"
-import "../wm"
+import "../../utils/client"
+import "../../utils/geom"
 
 import "core:slice"
 import "core:sync"
@@ -33,7 +33,7 @@ Animation :: struct {
 // Transforms a window's geometry over time
 //
 // The window's geometry is guaranteed to land on the specified geometry when *all* animations are complete
-animate_to :: proc(geometry : util.Geometry, frames : int, bounce : f32, wid : xcb.Window) -> Maybe(wm.X11Error) {
+animate_to :: proc(geometry : geom.Geometry, frames : int, bounce : f32, wid : xcb.Window) -> Maybe(client.XError) {
     // Enter animations lock
     if guard_animations() {
 
@@ -101,11 +101,11 @@ guard_animations :: proc() -> bool {
 
 @(private="file")
 configure_window_discard :: proc(change : GeometryChange, wid : xcb.Window) {
-    reply := xcb.get_geometry_reply(wm.connection, xcb.get_geometry(wm.connection, wid), nil)
+    reply := xcb.get_geometry_reply(client.connection, xcb.get_geometry(client.connection, wid), nil)
     if reply == nil do return
 
     cookie := xcb.configure_window(
-        wm.connection, wid,
+        client.connection, wid,
         xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y | xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT | xcb.CONFIG_WINDOW_BORDER_WIDTH,
         &[5]u32{
             u32(transmute(u16) (reply.x + change.x)),
@@ -117,7 +117,7 @@ configure_window_discard :: proc(change : GeometryChange, wid : xcb.Window) {
     )
 
     libc.free(reply)
-    xcb.discard_reply(wm.connection, cookie.sequence)
+    xcb.discard_reply(client.connection, cookie.sequence)
 }
 
 @(private="file")
