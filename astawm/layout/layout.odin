@@ -82,7 +82,7 @@ remove :: proc(layout : Layout, data : ^LayoutData, idx : u16) {
 
         // remove
         remove(l.inner^, &data.inner[index], idx - offset)
-        
+
         if data.inner[index].amount == 0 {
             delete(data.inner[index])
             ordered_remove(&data.inner, int(index))
@@ -251,7 +251,7 @@ calc_inner_layout :: proc(layout : Layout, data : LayoutData, using desktop_size
                 )
             }
         }
-        
+
     case MetaLayout:
         // layout of layouts
         overshoot = (overshoot * data.outer.amount - 1) / data.amount + 1

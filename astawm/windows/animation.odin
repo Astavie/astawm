@@ -46,7 +46,7 @@ animate_to :: proc(geometry : layout.Geometry, frames : int, bounce : f32, wid :
             height = i16(geometry.height) - i16(current.height),
             border_width = i16(geometry.border_width) - i16(current.border_width),
         }
-        
+
         if arr, ok := animations[wid]; ok {
             for anim in arr {
                 change.x -= anim.change.x
@@ -197,6 +197,6 @@ update_animations :: proc() {
                 delete_key(&animations, wid)
             }
         }
-        
+
     }
 }

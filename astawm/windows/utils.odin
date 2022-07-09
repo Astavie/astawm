@@ -31,7 +31,7 @@ gain_control :: proc(wid : xcb.Window) -> Maybe(client.XError) {
 // Get children of window
 get_children :: proc(wid : xcb.Window, alloc := context.allocator) -> (w : []xcb.Window, e : Maybe(client.XError)) {
     cookie := xcb.query_tree(client.connection, wid)
-    
+
     err : ^xcb.GenericError = ---
     tree := xcb.query_tree_reply(client.connection, cookie, &err)
 

@@ -1,13 +1,17 @@
 package client
 
 import "../vendor/xcb"
+import "../vendor/xcb_errors"
 
 import "core:strings"
 import "core:c/libc"
 
 connection : ^xcb.Connection
 
-@(private = "file")
+@private
+ctx : ^xcb_errors.Context
+
+@private
 atoms : map[cstring]xcb.Atom
 
 // Get atom from name
@@ -36,11 +40,14 @@ connect :: proc() -> bool {
         return false
     }
 
+    xcb_errors.context_new(connection, &ctx)
+
     return true
 }
 
 // Disconnect from the X server
 disconnect :: proc() {
+    xcb_errors.context_free(ctx)
     xcb.disconnect(connection)
     connection = nil
 }

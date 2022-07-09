@@ -17,7 +17,7 @@ XError :: struct {
 }
 
 // Print an error to the console
-print :: proc(ctx : ^xcb_errors.Context, err : XError) {
+print :: proc(err : XError) {
     fmt.eprint("XError: ")
     fmt.eprintf(err.message, ..err.args)
     fmt.eprintln()
@@ -27,8 +27,8 @@ print :: proc(ctx : ^xcb_errors.Context, err : XError) {
     fmt.eprintf("  %s\n", xcb_errors.get_name_for_minor_code(ctx, err.major_code, err.minor_code))
 }
 
-print_maybe :: proc(ctx : ^xcb_errors.Context, err : Maybe(XError)) {
-    if err, ok := err.?; ok do print(ctx, err)
+print_maybe :: proc(err : Maybe(XError)) {
+    if err, ok := err.?; ok do print(err)
 }
 
 // Checks if an xcb GenericError is not nil, returns said error

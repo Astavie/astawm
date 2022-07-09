@@ -34,7 +34,7 @@ refresh_layout :: proc(wids : []xcb.Window, lyt : layout.Layout, data : layout.L
 }
 
 // Main loop
-cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(client.XError) {
+cells :: proc() -> Maybe(client.XError) {
 
     // Create layout
     lyt := cast(layout.Layout) layout.MetaLayout {
@@ -42,7 +42,7 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(client.XError) {
         &cast(layout.Layout) layout.SeriesLayout { {},           8, 2, layout.Series.ROW,    false },
     }
     data : layout.LayoutData
-    
+
     // Get screen
     screen := xcb.setup_roots_iterator(xcb.get_setup(client.connection)).data
     windows.gain_control(screen.root) or_return
@@ -67,10 +67,7 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(client.XError) {
     delete(children)
 
     // refresh
-    client.print_maybe(
-        ctx,
-        refresh_layout(wids_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }),
-    )
+    client.print_maybe(refresh_layout(wids_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }))
     xcb.flush(client.connection)
 
     // event loop
@@ -90,14 +87,11 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(client.XError) {
 
         switch event.response_type & 0x7f {
             case 0:
-                client.print(
-                    ctx,
-                    client.convert(cast(^xcb.GenericError) event),
-                )
+                client.print(client.convert(cast(^xcb.GenericError) event))
 
             case xcb.CLIENT_MESSAGE:
                 cme := cast(^xcb.ClientMessageEvent) event
-                
+
                 if cme.type == client.lookup("ASTA_PRINT") or_return {
                     str := strings.string_from_nul_terminated_ptr(&cme.data.data8[0], 20)
                     fmt.println(str)
@@ -109,15 +103,12 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(client.XError) {
                 // add client to managed windows
                 append(&wids_mapped, mre.window)
                 append(&wids_stack, mre.window)
-        
+
                 ok := layout.insert_last(lyt, &data)
                 if !ok do panic("Could not fit window into layout")
 
                 // refresh
-                client.print_maybe(
-                    ctx,
-                    refresh_layout(wids_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }, mre.window),
-                )
+                client.print_maybe(refresh_layout(wids_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }, mre.window))
 
                 // map client
                 xcb.map_window(client.connection, mre.window)
@@ -161,20 +152,12 @@ main :: proc() {
     }
     defer client.disconnect()
 
-    // Create xcb error context
-    ctx : ^xcb_errors.Context = ---
-    _ = xcb_errors.context_new(client.connection, &ctx)
-    defer xcb_errors.context_free(ctx)
-
     // Run
     running := true
 
     t := thread.create_and_start_with_poly_data(&running, animations)
 
-    client.print_maybe(
-        ctx,
-        cells(ctx),
-    )
+    client.print_maybe(cells())
 
     running = false
     thread.join(t)
