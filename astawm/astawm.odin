@@ -2,8 +2,7 @@ package main
 
 import "../vendor/xcb"
 import "../vendor/xcb_errors"
-import "../utils/client"
-import "../utils/geom"
+import "../client"
 import "windows"
 import "layout"
 
@@ -14,7 +13,7 @@ import "core:thread"
 import "core:time"
 import "core:strings"
 
-refresh_layout :: proc(wids : []xcb.Window, lyt : layout.Layout, data : layout.LayoutData, size : geom.Size, new : Maybe(xcb.Window) = nil) -> Maybe(client.XError) {
+refresh_layout :: proc(wids : []xcb.Window, lyt : layout.Layout, data : layout.LayoutData, size : layout.Size, new : Maybe(xcb.Window) = nil) -> Maybe(client.XError) {
 
     for rect, idx in layout.calc_inner_layout(lyt, data, size) {
         if wids[idx] == new {
@@ -79,7 +78,7 @@ cells :: proc(ctx : ^xcb_errors.Context) -> Maybe(client.XError) {
         // Check connection
         error_code := xcb.connection_has_error(client.connection)
         if error_code != 0 {
-            fmt.print("Connection with the X server crashed\n")
+            fmt.eprint("Connection with the X server crashed\n")
             return nil
         }
 
@@ -157,7 +156,7 @@ animations :: proc(running : ^bool) {
 main :: proc() {
     // Connect to the X server
     if !client.connect() {
-        fmt.print("Could not connect to the X server\n")
+        fmt.eprint("Could not connect to the X server\n")
         return
     }
     defer client.disconnect()

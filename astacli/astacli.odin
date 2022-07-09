@@ -1,6 +1,7 @@
 package main
 
 import "../vendor/xcb"
+import "../client"
 import "core:c/libc"
 import "core:mem"
 

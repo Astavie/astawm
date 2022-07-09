@@ -1,14 +1,14 @@
 package windows
 
 import "../../vendor/xcb"
-import "../../utils/client"
-import "../../utils/geom"
+import "../../client"
+import "../layout"
 
 import "core:c/libc"
 import "core:strings"
 
 // Get the geometry of a window
-get_geometry :: proc(wid : xcb.Window) -> (g : geom.Geometry, merr : Maybe(client.XError)) {
+get_geometry :: proc(wid : xcb.Window) -> (g : layout.Geometry, merr : Maybe(client.XError)) {
     cookie := xcb.get_geometry(client.connection, wid)
     err : ^xcb.GenericError = ---
     reply := xcb.get_geometry_reply(client.connection, cookie, &err)
@@ -16,7 +16,7 @@ get_geometry :: proc(wid : xcb.Window) -> (g : geom.Geometry, merr : Maybe(clien
     client.check(err, "Error getting geometry for window %d", wid) or_return
     defer libc.free(reply)
 
-    return geom.geometry(
+    return layout.geometry(
         reply.x,
         reply.y,
         reply.width,

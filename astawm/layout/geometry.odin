@@ -1,4 +1,4 @@
-package geom
+package layout
 
 Pos :: distinct [2]i16
 

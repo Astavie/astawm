@@ -1,8 +1,8 @@
 package windows
 
 import "../../vendor/xcb"
-import "../../utils/client"
-import "../../utils/geom"
+import "../../client"
+import "../layout"
 
 import "core:slice"
 import "core:sync"
@@ -33,7 +33,7 @@ Animation :: struct {
 // Transforms a window's geometry over time
 //
 // The window's geometry is guaranteed to land on the specified geometry when *all* animations are complete
-animate_to :: proc(geometry : geom.Geometry, frames : int, bounce : f32, wid : xcb.Window) -> Maybe(client.XError) {
+animate_to :: proc(geometry : layout.Geometry, frames : int, bounce : f32, wid : xcb.Window) -> Maybe(client.XError) {
     // Enter animations lock
     if guard_animations() {
 

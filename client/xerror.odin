@@ -1,7 +1,7 @@
 package client
 
-import "../../vendor/xcb"
-import "../../vendor/xcb_errors"
+import "../vendor/xcb"
+import "../vendor/xcb_errors"
 
 import "core:fmt"
 import "core:c/libc"

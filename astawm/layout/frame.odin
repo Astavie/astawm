@@ -1,17 +1,15 @@
 package layout
 
-import "../../utils/geom"
-
 Frame :: struct {
-    frame_geometry : geom.Geometry,
-    inner_size     : geom.Size,
+    frame_geometry : Geometry,
+    inner_size     : Size,
 }
 
 Constraints :: struct {
 
 }
 
-calc_frame :: proc(target : geom.Rect, constraints : Constraints) -> Frame {
+calc_frame :: proc(target : Rect, constraints : Constraints) -> Frame {
 
     // TODO: conform to window demands
     // this just returns the target in frame form

@@ -1,7 +1,7 @@
 package windows
 
 import "../../vendor/xcb"
-import "../../utils/client"
+import "../../client"
 
 import "core:c/libc"
 import "core:mem"

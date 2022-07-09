@@ -1,6 +1,5 @@
 package layout
 
-import "../../utils/geom"
 import "core:builtin"
 
 Series :: enum {
@@ -204,19 +203,19 @@ insert_after :: proc(layout : Layout, data : ^LayoutData, idx : u16) -> (u16, bo
     return ---, false
 }
 
-calc_inner_layout :: proc(layout : Layout, data : LayoutData, using desktop_size : geom.Size, amount_override : u16 = 0) -> []geom.Rect {
+calc_inner_layout :: proc(layout : Layout, data : LayoutData, using desktop_size : Size, amount_override : u16 = 0) -> []Rect {
 
     // prevent division by 0
     if data.amount == 0 do return {}
 
     overshoot := max(data.amount, amount_override)
 
-    rects := make([]geom.Rect, data.amount)
+    rects := make([]Rect, data.amount)
 
     switch l in layout {
     case SingleLayout:
         // single window filling the entire screen
-        rects[0] = geom.rect(
+        rects[0] = rect(
             i16(l.padding_left),
             i16(l.padding_top),
             width  - l.padding_left - l.padding_right,
@@ -233,7 +232,7 @@ calc_inner_layout :: proc(layout : Layout, data : LayoutData, using desktop_size
             inner_width = (inner_width + l.gap_between) / overshoot - l.gap_between
             for i in 0..<data.amount {
                 j := data.amount - 1 - i if l.reverse else i
-                rects[i] = geom.rect(
+                rects[i] = rect(
                     i16(l.padding_left) + i16(inner_width + l.gap_between) * i16(j),
                     i16(l.padding_top),
                     inner_width,
@@ -244,7 +243,7 @@ calc_inner_layout :: proc(layout : Layout, data : LayoutData, using desktop_size
             inner_height = (inner_height + l.gap_between) / overshoot - l.gap_between
             for i in 0..<data.amount {
                 j := data.amount - 1 - i if l.reverse else i
-                rects[i] = geom.rect(
+                rects[i] = rect(
                     i16(l.padding_left),
                     i16(l.padding_top) + i16(inner_height + l.gap_between) * i16(j),
                     inner_width,
@@ -265,7 +264,7 @@ calc_inner_layout :: proc(layout : Layout, data : LayoutData, using desktop_size
             inner_rects := calc_inner_layout(l.inner^, data.inner[idx], outer_rect.size)
 
             for inner_rect in inner_rects {
-                rects[i] = geom.Rect {
+                rects[i] = Rect {
                     outer_rect.pos + inner_rect.pos,
                     inner_rect.size,
                 }
