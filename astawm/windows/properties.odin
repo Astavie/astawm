@@ -104,13 +104,13 @@ set_num :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T)
 where intrinsics.type_is_numeric(T) {
     format :: size_of(T) * 8
     tmp := t
-    xcb.change_property(client.connection, 0, wid, prop, type, format, 1, &tmp)
+    xcb.change_property(client.connection, xcb.PROP_MODE_REPLACE, wid, prop, type, format, 1, &tmp)
 }
 
 set_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T/[]$E)
 where intrinsics.type_is_numeric(E) {
     format :: size_of(T) * 8
-    xcb.change_property(client.connection, 0, wid, prop, type, format, u32(len(t)), &t[0])
+    xcb.change_property(client.connection, xcb.PROP_MODE_REPLACE, wid, prop, type, format, u32(len(t)), &t[0])
 }
 
 set_string :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, s : string) {
@@ -128,13 +128,13 @@ prepend_num :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T)
 where intrinsics.type_is_numeric(T) {
     format :: size_of(T) * 8
     tmp := t
-    xcb.change_property(client.connection, 1, wid, prop, type, format, 1, &tmp)
+    xcb.change_property(client.connection, xcb.PROP_MODE_PREPEND, wid, prop, type, format, 1, &tmp)
 }
 
 prepend_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T/[]$E)
 where intrinsics.type_is_numeric(E) {
     format :: size_of(T) * 8
-    xcb.change_property(client.connection, 1, wid, prop, type, format, u32(len(t)), &t[0])
+    xcb.change_property(client.connection, xcb.PROP_MODE_PREPEND, wid, prop, type, format, u32(len(t)), &t[0])
 }
 
 prepend_string :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, s : string) {
@@ -151,13 +151,13 @@ append_num :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T)
 where intrinsics.type_is_numeric(T) {
     format :: size_of(T) * 8
     tmp := t
-    xcb.change_property(client.connection, 2, wid, prop, type, format, 1, &tmp)
+    xcb.change_property(client.connection, xcb.PROP_MODE_APPEND, wid, prop, type, format, 1, &tmp)
 }
 
 append_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T/[]$E)
 where intrinsics.type_is_numeric(E) {
     format :: size_of(T) * 8
-    xcb.change_property(client.connection, 2, wid, prop, type, format, u32(len(t)), &t[0])
+    xcb.change_property(client.connection, xcb.PROP_MODE_APPEND, wid, prop, type, format, u32(len(t)), &t[0])
 }
 
 append_string :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, s : string) {
