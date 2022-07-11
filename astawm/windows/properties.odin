@@ -2,66 +2,170 @@ package windows
 
 import "../../vendor/xcb"
 import "../../client"
-import "../layout"
 
 import "core:c/libc"
+import "core:slice"
+import "core:mem"
+import "core:intrinsics"
 import "core:strings"
 
-// Get the geometry of a window
-get_geometry :: proc(wid : xcb.Window) -> (g : layout.Geometry, merr : Maybe(client.XError)) {
-    cookie := xcb.get_geometry(client.connection, wid)
-    err : ^xcb.GenericError = ---
-    reply := xcb.get_geometry_reply(client.connection, cookie, &err)
-
-    client.check(err, "Error getting geometry for window %d", wid) or_return
-    defer libc.free(reply)
-
-    return layout.geometry(
-        reply.x,
-        reply.y,
-        reply.width,
-        reply.height,
-        reply.border_width,
-    ), nil
-}
-
 // Get atom value for window
-@(private="file")
-get_value :: proc(atom : xcb.Atom, wid : xcb.Window) -> (reply : ^xcb.GetPropertyReply, merr : Maybe(client.XError)) {
-    cookie := xcb.get_property(client.connection, 0, wid, atom, xcb.GET_PROPERTY_TYPE_ANY, 0, ~u32(0))
+@private
+get_property_reply :: proc(wid : xcb.Window, prop : xcb.Atom) -> (reply : ^xcb.GetPropertyReply, merr : Maybe(client.XError)) {
+    cookie := xcb.get_property(client.connection, 0, wid, prop, xcb.GET_PROPERTY_TYPE_ANY, 0, ~u32(0))
     err : ^xcb.GenericError = ---
     reply = xcb.get_property_reply(client.connection, cookie, &err)
 
-    client.check(err, "Could not get atom value for atom %d of window %d", atom, wid) or_return
+    client.check(err, "Could not get value for property atom %d of window %d", prop, wid) or_return
 
     return reply, nil
 }
 
 // Turns an atom value into a string
-@(private="file")
-string_from_prop :: proc(reply : ^xcb.GetPropertyReply) -> string {
-    ptr := cast(^u8) xcb.get_property_value(reply)
+@private
+slice_from_prop :: proc(reply : ^xcb.GetPropertyReply, $E: typeid) -> []E {
+    ptr := cast(^E) xcb.get_property_value(reply)
     len := cast(int) xcb.get_property_value_length(reply)
-    return strings.string_from_ptr(ptr, len)
+    return slice.from_ptr(ptr, len)
+}
+
+// Get value for window
+get_num :: proc(wid : xcb.Window, prop : xcb.Atom, $T : typeid) -> (t : T, e : Maybe(client.XError))
+where intrinsics.type_is_numeric(T) {
+
+    reply := get_property_reply(wid, prop) or_return
+    defer libc.free(reply)
+    return (cast(^T) xcb.get_property_value(reply))^, nil
+}
+
+// Get slice value for window
+get_slice :: proc(wid : xcb.Window, prop : xcb.Atom, $T : typeid/[]$E, alloc := context.allocator) -> (t : T, e : Maybe(client.XError))
+where intrinsics.type_is_numeric(E) {
+
+    reply := get_property_reply(wid, prop) or_return
+    defer libc.free(reply)
+    return slice.clone(slice_from_prop(reply, E), alloc), nil
 }
 
 // Get string value for window
-get_string_value :: proc(atom : xcb.Atom, wid : xcb.Window, alloc := context.allocator) -> (str : string, e : Maybe(client.XError)) {
-    reply := get_value(atom, wid) or_return
-    defer libc.free(reply)
-    return strings.clone(string_from_prop(reply), alloc), nil
+get_string :: proc(wid : xcb.Window, prop : xcb.Atom, $T : typeid/string, alloc := context.allocator) -> (s : string, e : Maybe(client.XError)) {
+    str, err := get_slice(wid, prop, []u8, alloc)
+    return transmute(string) str, err
 }
 
-// Get window title
-get_title :: proc(wid : xcb.Window, alloc := context.allocator) -> (str : string, e : Maybe(client.XError)) {
-    // EWWH name
-    reply := get_value(client.lookup("_NET_WM_NAME") or_return, wid) or_return
-    if (xcb.get_property_value_length(reply) == 0) {
-        // ICCCM name
-        libc.free(reply)
-        reply = get_value(xcb.ATOM_WM_NAME, wid) or_return
+// Get slice of strings (assumes property contains NULL-terminated strings)
+get_string_slice :: proc(wid : xcb.Window, prop : xcb.Atom, $T : typeid/[]string, alloc := context.allocator) -> (s : []string, e : Maybe(client.XError)) {
+    reply := get_property_reply(wid, prop) or_return
+    defer libc.free(reply)
+
+    arr := slice_from_prop(reply, u8)
+    strings := make([]string, slice.count(arr, 0), alloc)
+
+    start := 0
+    idx := 0
+    for c, i in arr {
+        if c == 0 {
+            strings[idx] = transmute(string) slice.clone(arr[start:i], alloc)
+            idx += 1
+            start = i + 1
+        }
     }
 
-    defer libc.free(reply)
-    return strings.clone(string_from_prop(reply), alloc), nil
+    return strings, nil
 }
+
+get_prop :: proc { get_num, get_slice, get_string, get_string_slice }
+
+@private
+terminate_string :: proc(s : string, alloc := context.allocator) -> []u8 {
+    arr := make([]u8, len(s) + 1, alloc)
+    mem.copy_non_overlapping(&arr[0], &(transmute([]u8) s)[0], len(s) * size_of(u8))
+    return arr
+}
+
+@private
+terminate_string_slice :: proc(s : []string, alloc := context.allocator) -> []u8 {
+    size := 0
+    for str in s {
+        size += len(str) + 1
+    }
+
+    arr := make([]u8, size, alloc)
+    start := 0
+    for str in s {
+        mem.copy_non_overlapping(&arr[start], &(transmute([]u8) str)[0], len(str) * size_of(u8))
+        start += len(str) + 1
+    }
+
+    return arr
+}
+
+set_num :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T)
+where intrinsics.type_is_numeric(T) {
+    format :: size_of(T) * 8
+    tmp := t
+    xcb.change_property(client.connection, 0, wid, prop, type, format, 1, &tmp)
+}
+
+set_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T/[]$E)
+where intrinsics.type_is_numeric(E) {
+    format :: size_of(T) * 8
+    xcb.change_property(client.connection, 0, wid, prop, type, format, u32(len(t)), &t[0])
+}
+
+set_string :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, s : string) {
+    // Properties that contain a single string are not NULL-terminated
+    set_slice(wid, prop, type, transmute([]u8) s)
+}
+
+set_string_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, s : []string) {
+    set_slice(wid, prop, type, terminate_string_slice(s, context.temp_allocator))
+}
+
+set_prop :: proc { set_num, set_slice, set_string, set_string_slice }
+
+prepend_num :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T)
+where intrinsics.type_is_numeric(T) {
+    format :: size_of(T) * 8
+    tmp := t
+    xcb.change_property(client.connection, 1, wid, prop, type, format, 1, &tmp)
+}
+
+prepend_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T/[]$E)
+where intrinsics.type_is_numeric(E) {
+    format :: size_of(T) * 8
+    xcb.change_property(client.connection, 1, wid, prop, type, format, u32(len(t)), &t[0])
+}
+
+prepend_string :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, s : string) {
+    prepend_slice(wid, prop, type, terminate_string(s, context.temp_allocator))
+}
+
+prepend_string_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, s : []string) {
+    prepend_slice(wid, prop, type, terminate_string_slice(s, context.temp_allocator))
+}
+
+prepend_prop :: proc { prepend_num, prepend_slice, prepend_string, prepend_string_slice }
+
+append_num :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T)
+where intrinsics.type_is_numeric(T) {
+    format :: size_of(T) * 8
+    tmp := t
+    xcb.change_property(client.connection, 2, wid, prop, type, format, 1, &tmp)
+}
+
+append_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T/[]$E)
+where intrinsics.type_is_numeric(E) {
+    format :: size_of(T) * 8
+    xcb.change_property(client.connection, 2, wid, prop, type, format, u32(len(t)), &t[0])
+}
+
+append_string :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, s : string) {
+    append_slice(wid, prop, type, terminate_string(s, context.temp_allocator))
+}
+
+append_string_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, s : []string) {
+    append_slice(wid, prop, type, terminate_string_slice(s, context.temp_allocator))
+}
+
+append_prop :: proc { append_num, append_slice, append_string, append_string_slice }

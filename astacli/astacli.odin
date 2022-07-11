@@ -10,10 +10,9 @@ import "core:intrinsics"
 
 to_fixed_array :: proc(str : string, $N : int) -> (result : [N]u8) {
     length := len(str)
-    slice := transmute([]u8) str
+    assert(length < N)
 
-    mem.copy_non_overlapping(&result[0], &slice[0], length * size_of(u8))
-    result[length] = 0
+    mem.copy_non_overlapping(&result[0], &(transmute([]u8) str)[0], length * size_of(u8))
     return
 }
 
