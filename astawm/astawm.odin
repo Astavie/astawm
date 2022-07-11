@@ -47,6 +47,33 @@ cells :: proc() -> Maybe(client.XError) {
     screen := xcb.setup_roots_iterator(xcb.get_setup(client.connection)).data
     windows.gain_control(screen.root) or_return
 
+    // Set some properties on the root window
+    windows.set_prop(screen.root, client.lookup("_NET_SUPPORTED") or_return, xcb.ATOM_ATOM, []xcb.Atom {
+
+        // supported client properties
+        client.lookup("_NET_WM_USER_TIME") or_return,
+
+    })
+
+    windows.set_prop(screen.root, client.lookup("_NET_NUMBER_OF_DESKTOPS") or_return, xcb.ATOM_CARDINAL, 1)
+    windows.set_prop(screen.root, client.lookup("_NET_DESKTOP_GEOMETRY")   or_return, xcb.ATOM_CARDINAL, []u32{ u32(screen.width_in_pixels), u32(screen.height_in_pixels) })
+    windows.set_prop(screen.root, client.lookup("_NET_DESKTOP_VIEWPORT")   or_return, xcb.ATOM_CARDINAL, []u32{ 0, 0 })
+    windows.set_prop(screen.root, client.lookup("_NET_CURRENT_DESKTOP")    or_return, xcb.ATOM_CARDINAL, 0)
+        // TODO: _NET_WORKAREA, possibly _NET_VIRTUAL_ROOTS ?
+
+    // Create tiny window for _NET_SUPPORTING_WM_CHECK
+    support := xcb.generate_id(client.connection)
+
+    client.check_cookie(
+        xcb.create_window_checked(client.connection, xcb.COPY_FROM_PARENT, support, screen.root, 0, 0, 1, 1, 0, xcb.WINDOW_CLASS_INPUT_OUTPUT, xcb.COPY_FROM_PARENT, 0, nil),
+        "Could not create window for _NET_SUPPORTING_WM_CHECK",
+    ) or_return
+    
+    _NET_SUPPORTING_WM_CHECK := client.lookup("_NET_SUPPORTING_WM_CHECK") or_return
+    windows.set_prop (screen.root, _NET_SUPPORTING_WM_CHECK, xcb.ATOM_WINDOW, support)
+    windows.set_prop (support,     _NET_SUPPORTING_WM_CHECK, xcb.ATOM_WINDOW, support)
+    windows.set_title(support, "astawm")
+
     // Get all top-level windows
     children := windows.get_children(screen.root) or_return
 

@@ -78,3 +78,9 @@ get_title :: proc(wid : xcb.Window, alloc := context.allocator) -> (str : string
     defer libc.free(reply)
     return transmute(string) slice.clone(slice_from_prop(reply, u8), alloc), nil
 }
+
+// Set window title
+set_title :: proc(wid : xcb.Window, title : string) -> Maybe(client.XError) {
+    set_prop(wid, client.lookup("_NET_WM_NAME") or_return, client.lookup("UTF8_STRING") or_return, title)
+    return nil
+}
