@@ -113,7 +113,7 @@ insert_first :: proc(layout : Layout, data : ^LayoutData) -> bool {
             data.amount += 1
             return true
         } else if insert_first(l.outer^, data.outer) {
-            insert_at(&data.inner, 0, LayoutData{})
+            inject_at(&data.inner, 0, LayoutData{})
             assert(insert_first(l.inner^, &data.inner[0]))
 
             data.amount += 1
@@ -187,7 +187,7 @@ insert_after :: proc(layout : Layout, data : ^LayoutData, idx : u16) -> (u16, bo
 
         // add new sub-layout
         if outer_index, ok := insert_after(l.outer^, data.outer, index); ok {
-            insert_at(&data.inner, int(outer_index), LayoutData{})
+            inject_at(&data.inner, int(outer_index), LayoutData{})
             assert(insert_first(l.inner^, &data.inner[outer_index]))
 
             offset = 0
@@ -200,7 +200,7 @@ insert_after :: proc(layout : Layout, data : ^LayoutData, idx : u16) -> (u16, bo
         panic("undefined layout")
     }
 
-    return ---, false
+    return 0, false
 }
 
 calc_inner_layout :: proc(layout : Layout, data : LayoutData, using desktop_size : Size, amount_override : u16 = 0) -> []Rect {

@@ -1,8 +1,2 @@
-# binary
 *.bin
-
-# language server
-ols.json
-
-# old files
-linux95.odin
+.direnv

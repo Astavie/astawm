@@ -146,7 +146,9 @@ update_animations :: proc() {
     if guard_animations() {
 
         // Update animations
-        keys := slice.map_keys(animations)
+        keys, err := slice.map_keys(animations)
+        if err != nil do panic("");
+
         for wid in keys {
             arr := &animations[wid]
 

@@ -102,16 +102,16 @@ terminate_string_slice :: proc(s : []string, alloc := context.allocator) -> []u8
 
 STRUCT_FORMAT :: 32
 
-set_val :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T, format := u8(size_of(T) * 8) when intrinsics.type_is_numeric(T) else STRUCT_FORMAT)
+set_val :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T, format : u8 = u8(size_of(T) * 8) when intrinsics.type_is_numeric(T) else STRUCT_FORMAT)
 where intrinsics.type_is_numeric(T) || intrinsics.type_is_struct(T) {
     size := u32(size_of(T) * 8 / format)
     tmp := t
     xcb.change_property(client.connection, xcb.PROP_MODE_REPLACE, wid, prop, type, format, size, &tmp)
 }
 
-set_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T/[]$E, format := u8(size_of(E) * 8) when intrinsics.type_is_numeric(E) else STRUCT_FORMAT)
-where intrinsics.type_is_numeric(E) || intrinsics.type_is_struct(E) {
-    size := u32(size_of(E) * 8 / format)
+set_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : []$T, format : u8 = u8(size_of(T) * 8) when intrinsics.type_is_numeric(T) else STRUCT_FORMAT)
+where intrinsics.type_is_numeric(T) || intrinsics.type_is_struct(T) {
+    size := u32(size_of(T) * 8 / format)
     xcb.change_property(client.connection, xcb.PROP_MODE_REPLACE, wid, prop, type, format, u32(len(t)) * size, &t[0])
 }
 
@@ -126,16 +126,16 @@ set_string_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, s :
 
 set_prop :: proc { set_val, set_slice, set_string, set_string_slice }
 
-prepend_val :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T, format := u8(size_of(T) * 8) when intrinsics.type_is_numeric(T) else STRUCT_FORMAT)
+prepend_val :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T, format : u8 = u8(size_of(T) * 8) when intrinsics.type_is_numeric(T) else STRUCT_FORMAT)
 where intrinsics.type_is_numeric(T) || intrinsics.type_is_struct(T) {
     size := u32(size_of(T) * 8 / format)
     tmp := t
     xcb.change_property(client.connection, xcb.PROP_MODE_PREPEND, wid, prop, type, format, size, &tmp)
 }
 
-prepend_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T/[]$E, format := u8(size_of(E) * 8) when intrinsics.type_is_numeric(E) else STRUCT_FORMAT)
-where intrinsics.type_is_numeric(E) || intrinsics.type_is_struct(E) {
-    size := u32(size_of(E) * 8 / format)
+prepend_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : []$T, format : u8 = u8(size_of(T) * 8) when intrinsics.type_is_numeric(T) else STRUCT_FORMAT)
+where intrinsics.type_is_numeric(T) || intrinsics.type_is_struct(T) {
+    size := u32(size_of(T) * 8 / format)
     xcb.change_property(client.connection, xcb.PROP_MODE_PREPEND, wid, prop, type, format, u32(len(t)) * size, &t[0])
 }
 
@@ -156,7 +156,7 @@ where intrinsics.type_is_numeric(T) || intrinsics.type_is_struct(T) {
     xcb.change_property(client.connection, xcb.PROP_MODE_APPEND, wid, prop, type, format, size, &tmp)
 }
 
-append_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T/[]$E, format := u8(size_of(E) * 8) when intrinsics.type_is_numeric(E) else STRUCT_FORMAT)
+append_slice :: proc(wid : xcb.Window, prop : xcb.Atom, type : xcb.Atom, t : $T/[]$E, format : u8 = u8(size_of(E) * 8) when intrinsics.type_is_numeric(E) else STRUCT_FORMAT)
 where intrinsics.type_is_numeric(E) || intrinsics.type_is_struct(E) {
     size := u32(size_of(E) * 8 / format)
     xcb.change_property(client.connection, xcb.PROP_MODE_APPEND, wid, prop, type, format, u32(len(t)) * size, &t[0])

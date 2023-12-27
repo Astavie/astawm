@@ -55,10 +55,10 @@ cells :: proc() -> Maybe(client.XError) {
 
     })
 
-    windows.set_prop(screen.root, client.lookup("_NET_NUMBER_OF_DESKTOPS") or_return, xcb.ATOM_CARDINAL, 1)
+    windows.set_prop(screen.root, client.lookup("_NET_NUMBER_OF_DESKTOPS") or_return, xcb.ATOM_CARDINAL, u32(1))
     windows.set_prop(screen.root, client.lookup("_NET_DESKTOP_GEOMETRY")   or_return, xcb.ATOM_CARDINAL, []u32{ u32(screen.width_in_pixels), u32(screen.height_in_pixels) })
     windows.set_prop(screen.root, client.lookup("_NET_DESKTOP_VIEWPORT")   or_return, xcb.ATOM_CARDINAL, []u32{ 0, 0 })
-    windows.set_prop(screen.root, client.lookup("_NET_CURRENT_DESKTOP")    or_return, xcb.ATOM_CARDINAL, 0)
+    windows.set_prop(screen.root, client.lookup("_NET_CURRENT_DESKTOP")    or_return, xcb.ATOM_CARDINAL, u32(0))
         // TODO: _NET_WORKAREA, possibly _NET_VIRTUAL_ROOTS ?
 
     // Create tiny window for _NET_SUPPORTING_WM_CHECK
@@ -68,7 +68,7 @@ cells :: proc() -> Maybe(client.XError) {
         xcb.create_window_checked(client.connection, xcb.COPY_FROM_PARENT, support, screen.root, 0, 0, 1, 1, 0, xcb.WINDOW_CLASS_INPUT_OUTPUT, xcb.COPY_FROM_PARENT, 0, nil),
         "Could not create window for _NET_SUPPORTING_WM_CHECK",
     ) or_return
-    
+
     _NET_SUPPORTING_WM_CHECK := client.lookup("_NET_SUPPORTING_WM_CHECK") or_return
     windows.set_prop (screen.root, _NET_SUPPORTING_WM_CHECK, xcb.ATOM_WINDOW, support)
     windows.set_prop (support,     _NET_SUPPORTING_WM_CHECK, xcb.ATOM_WINDOW, support)
@@ -81,7 +81,7 @@ cells :: proc() -> Maybe(client.XError) {
     wids_stack  := make([dynamic]xcb.Window, 0, len(children))
 
     for child in children {
-        if !windows.can_manipulate(child) or_return do continue
+        if !(windows.can_manipulate(child) or_return) do continue
 
         // add client to managed windows
         append(&wids_mapped, child)
@@ -119,8 +119,8 @@ cells :: proc() -> Maybe(client.XError) {
             case xcb.CLIENT_MESSAGE:
                 cme := cast(^xcb.ClientMessageEvent) event
 
-                if cme.type == client.lookup("ASTA_PRINT") or_return {
-                    str := strings.string_from_nul_terminated_ptr(&cme.data.data8[0], 20)
+                if cme.type == (client.lookup("ASTA_PRINT") or_return) {
+                    str := strings.string_from_null_terminated_ptr(&cme.data.data8[0], 20)
                     fmt.println(str)
                 }
 

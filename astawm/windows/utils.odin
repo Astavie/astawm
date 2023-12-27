@@ -44,7 +44,7 @@ get_children :: proc(wid : xcb.Window, alloc := context.allocator) -> (w : []xcb
     len := cast(int) xcb.query_tree_children_length(tree)
 
     arr := mem.slice_ptr(ptr, len)
-    return mem.clone_slice(arr, alloc), nil
+    return slice.clone(arr, alloc), nil
 }
 
 // Get the geometry of a window
