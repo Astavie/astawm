@@ -18,7 +18,7 @@ import "core:strings"
 cells :: proc() -> Maybe(client.XError) {
 
     // Create layout
-    gr := new(grid.Grid)
+    gr := grid.Grid {}
     gr.rows = 2
     gr.columns = 3
 
@@ -62,7 +62,7 @@ cells :: proc() -> Maybe(client.XError) {
         if !(windows.can_manipulate(child) or_return) do continue
 
         // add client to managed windows
-        grid.insert(gr, child, screen_size) or_return
+        grid.insert(&gr, child, screen_size) or_return
     }
 
     delete(children)
@@ -98,7 +98,7 @@ cells :: proc() -> Maybe(client.XError) {
                 mre := cast(^xcb.MapRequestEvent) event
 
                 // add client to managed windows
-                grid.insert(gr, mre.window, screen_size) or_return
+                grid.insert(&gr, mre.window, screen_size) or_return
 
                 // map client
                 xcb.map_window(client.connection, mre.window)
@@ -106,7 +106,7 @@ cells :: proc() -> Maybe(client.XError) {
 
             case xcb.UNMAP_NOTIFY:
                 umn := cast(^xcb.UnmapNotifyEvent) event
-                grid.remove(gr, umn.window)
+                grid.remove(&gr, umn.window)
         }
     }
 
