@@ -147,7 +147,7 @@ update_animations :: proc() {
 
         // Update animations
         keys, err := slice.map_keys(animations)
-        if err != nil do panic("");
+        if err != nil do panic("Out of memory")
 
         for wid in keys {
             arr := &animations[wid]

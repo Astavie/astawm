@@ -5,6 +5,7 @@ import "../vendor/xcb_errors"
 import "../client"
 import "windows"
 import "layout"
+import "grid"
 
 import "core:fmt"
 import "core:c/libc"
@@ -13,38 +14,18 @@ import "core:thread"
 import "core:time"
 import "core:strings"
 
-refresh_layout :: proc(wids : []xcb.Window, lyt : layout.Layout, data : layout.LayoutData, size : layout.Size, new : Maybe(xcb.Window) = nil) -> Maybe(client.XError) {
-
-    for rect, idx in layout.calc_inner_layout(lyt, data, size) {
-        if wids[idx] == new {
-            xcb.configure_window(client.connection, wids[idx], 31, &[5]u32{
-                u32(transmute(u16) rect.x),
-                u32(transmute(u16) rect.y),
-                u32(rect.width),
-                u32(rect.height),
-                0,
-            })
-        } else {
-            windows.animate_to({ rect, 0 }, 15, 1, wids[idx]) or_return
-        }
-    }
-
-    return nil
-
-}
-
 // Main loop
 cells :: proc() -> Maybe(client.XError) {
 
     // Create layout
-    lyt := cast(layout.Layout) layout.MetaLayout {
-        &cast(layout.Layout) layout.SeriesLayout { {8, 8, 8, 8}, 8, 0, layout.Series.COLUMN, false },
-        &cast(layout.Layout) layout.SeriesLayout { {},           8, 2, layout.Series.ROW,    false },
-    }
-    data : layout.LayoutData
+    gr := new(grid.Grid)
+    gr.rows = 2
+    gr.columns = 3
 
     // Get screen
     screen := xcb.setup_roots_iterator(xcb.get_setup(client.connection)).data
+    screen_size := layout.Size { screen.width_in_pixels, screen.height_in_pixels }
+
     windows.gain_control(screen.root) or_return
 
     // Set some properties on the root window
@@ -77,25 +58,14 @@ cells :: proc() -> Maybe(client.XError) {
     // Get all top-level windows
     children := windows.get_children(screen.root) or_return
 
-    wids_mapped := make([dynamic]xcb.Window, 0, len(children))
-    wids_stack  := make([dynamic]xcb.Window, 0, len(children))
-
     for child in children {
         if !(windows.can_manipulate(child) or_return) do continue
 
         // add client to managed windows
-        append(&wids_mapped, child)
-        append(&wids_stack, child)
-
-        ok := layout.insert_last(lyt, &data)
-        if !ok do panic("Could not fit window into layout")
+        grid.insert(gr, child, screen_size) or_return
     }
 
     delete(children)
-
-    // refresh
-    client.print_maybe(refresh_layout(wids_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }))
-    xcb.flush(client.connection)
 
     // event loop
     for {
@@ -128,14 +98,7 @@ cells :: proc() -> Maybe(client.XError) {
                 mre := cast(^xcb.MapRequestEvent) event
 
                 // add client to managed windows
-                append(&wids_mapped, mre.window)
-                append(&wids_stack, mre.window)
-
-                ok := layout.insert_last(lyt, &data)
-                if !ok do panic("Could not fit window into layout")
-
-                // refresh
-                client.print_maybe(refresh_layout(wids_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels }, mre.window))
+                grid.insert(gr, mre.window, screen_size) or_return
 
                 // map client
                 xcb.map_window(client.connection, mre.window)
@@ -143,18 +106,7 @@ cells :: proc() -> Maybe(client.XError) {
 
             case xcb.UNMAP_NOTIFY:
                 umn := cast(^xcb.UnmapNotifyEvent) event
-
-                if idx, ok := slice.linear_search(wids_stack[:], umn.window); ok {
-                    layout.remove(lyt, &data, u16(idx))
-                    ordered_remove(&wids_stack, idx)
-
-                    map_idx, ok := slice.linear_search(wids_mapped[:], umn.window)
-                    if !ok do panic("window is in stack-ordered array but not map-ordered array")
-                    ordered_remove(&wids_mapped, map_idx)
-
-                    refresh_layout(wids_stack[:], lyt, data, { screen.width_in_pixels, screen.height_in_pixels })
-                    xcb.flush(client.connection)
-                }
+                grid.remove(gr, umn.window)
         }
     }
 

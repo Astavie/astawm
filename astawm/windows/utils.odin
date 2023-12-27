@@ -65,6 +65,22 @@ get_geometry :: proc(wid : xcb.Window) -> (g : layout.Geometry, merr : Maybe(cli
     ), nil
 }
 
+set_geometry :: proc(wid: xcb.Window, using geometry: layout.Geometry) -> Maybe(client.XError) {
+    cookie := xcb.configure_window(
+        client.connection, wid,
+        xcb.CONFIG_WINDOW_X | xcb.CONFIG_WINDOW_Y | xcb.CONFIG_WINDOW_WIDTH | xcb.CONFIG_WINDOW_HEIGHT | xcb.CONFIG_WINDOW_BORDER_WIDTH,
+        &[5]u32{
+            u32(transmute(u16) x),
+            u32(transmute(u16) y),
+            u32(width),
+            u32(height),
+            u32(border_width),
+        },
+    )
+    client.check_cookie(cookie, "Could not configure window") or_return
+    return nil
+}
+
 // Get window title
 get_title :: proc(wid : xcb.Window, alloc := context.allocator) -> (str : string, e : Maybe(client.XError)) {
     // EWWH name

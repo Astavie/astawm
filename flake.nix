@@ -23,6 +23,7 @@
           buildInputs = with pkgs; [
             xorg.libxcb
             xorg.xcbutilerrors
+            xorg.xeyes
           ];
 
           LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath buildInputs}";

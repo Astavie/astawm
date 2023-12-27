@@ -30,3 +30,8 @@ geometry :: #force_inline proc(x, y : i16, width, height, border_width : u16) ->
         border_width,
     }
 }
+
+intersects :: proc(a: Rect, b: Rect) -> bool {
+    return a.x < b.x + i16(b.width) && a.x + i16(a.width) > b.x &&
+        a.y + i16(a.height) > b.y && a.y < b.y + i16(b.height)
+}
