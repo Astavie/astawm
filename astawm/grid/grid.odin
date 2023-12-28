@@ -61,14 +61,29 @@ screen_coords :: proc(grid: ^Grid, spot: layout.Rect, screen: layout.Size) -> la
 	)
 }
 
+refresh :: proc(grid: ^Grid, screen: layout.Size) -> Maybe(client.XError) {
+	for win in grid.windows {
+		coords := screen_coords(grid, win.pos, screen)
+		windows.set_position(win.wid, coords.pos) or_return
+	}
+	return nil
+}
+
 insert :: proc(grid: ^Grid, wid: xcb.Window, screen: layout.Size) -> Maybe(client.XError) {
-	// check if fits under cursor
 	spot := empty_spot(grid)
-	append(&grid.windows, GridWindow { wid, spot })
+
+	if spot.x < grid.pos.x {
+		grid.pos.x = spot.x
+		refresh(grid, screen) or_return
+	} else if spot.x > grid.pos.x && spot.x + i16(spot.width) > grid.pos.x + i16(grid.columns) {
+		grid.pos.x = min(spot.x, spot.x + i16(spot.width) - i16(grid.columns))
+		refresh(grid, screen) or_return
+	}
 
 	coords := screen_coords(grid, spot, screen)
 	windows.set_geometry(wid, { coords, 0 }) or_return
 
+	append(&grid.windows, GridWindow { wid, spot })
 	grid.cursor = spot
 	return nil
 }
