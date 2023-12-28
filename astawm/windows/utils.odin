@@ -30,6 +30,19 @@ gain_control :: proc(wid : xcb.Window) -> Maybe(client.XError) {
     return nil
 }
 
+watch_focus :: proc(wid : xcb.Window) {
+    mask := xcb.EVENT_MASK_FOCUS_CHANGE
+    cookie := xcb.change_window_attributes(client.connection, wid, xcb.CW_EVENT_MASK, &mask)
+}
+
+do_map :: proc(wid : xcb.Window) {
+    xcb.map_window(client.connection, wid)
+}
+
+focus :: proc(wid : xcb.Window) {
+    xcb.set_input_focus(client.connection, xcb.INPUT_FOCUS_NONE, wid, xcb.CURRENT_TIME)
+}
+
 // Get children of window
 get_children :: proc(wid : xcb.Window, alloc := context.allocator) -> (w : []xcb.Window, e : Maybe(client.XError)) {
     cookie := xcb.query_tree(client.connection, wid)

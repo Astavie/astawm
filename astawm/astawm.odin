@@ -17,11 +17,6 @@ import "core:strings"
 // Main loop
 cells :: proc() -> Maybe(client.XError) {
 
-    // Create layout
-    gr := grid.Grid {}
-    gr.rows = 2
-    gr.columns = 3
-
     // Get screen
     screen := xcb.setup_roots_iterator(xcb.get_setup(client.connection)).data
     screen_size := layout.Size { screen.width_in_pixels, screen.height_in_pixels }
@@ -46,7 +41,7 @@ cells :: proc() -> Maybe(client.XError) {
     support := xcb.generate_id(client.connection)
 
     client.check_cookie(
-        xcb.create_window_checked(client.connection, xcb.COPY_FROM_PARENT, support, screen.root, 0, 0, 1, 1, 0, xcb.WINDOW_CLASS_INPUT_OUTPUT, xcb.COPY_FROM_PARENT, 0, nil),
+        xcb.create_window_checked(client.connection, xcb.COPY_FROM_PARENT, support, screen.root, 0, 0, 1, 1, 0, xcb.WINDOW_CLASS_INPUT_OUTPUT, screen.root_visual, 0, nil),
         "Could not create window for _NET_SUPPORTING_WM_CHECK",
     ) or_return
 
@@ -54,6 +49,9 @@ cells :: proc() -> Maybe(client.XError) {
     windows.set_prop (screen.root, _NET_SUPPORTING_WM_CHECK, xcb.ATOM_WINDOW, support)
     windows.set_prop (support,     _NET_SUPPORTING_WM_CHECK, xcb.ATOM_WINDOW, support)
     windows.set_title(support, "astawm")
+
+    // Create grid
+    gr := grid.init(2, 3, 4, screen) or_return
 
     // Get all top-level windows
     children := windows.get_children(screen.root) or_return
@@ -66,6 +64,7 @@ cells :: proc() -> Maybe(client.XError) {
     }
 
     delete(children)
+    xcb.flush(client.connection)
 
     // event loop
     for {
@@ -97,16 +96,25 @@ cells :: proc() -> Maybe(client.XError) {
             case xcb.MAP_REQUEST:
                 mre := cast(^xcb.MapRequestEvent) event
 
-                // add client to managed windows
+                // add client to grid
+                spot := grid.empty_spot(&gr)
+                grid.focus_spot(&gr, spot, screen_size) or_return
                 grid.insert(&gr, mre.window, screen_size) or_return
 
                 // map client
-                xcb.map_window(client.connection, mre.window)
+                windows.do_map(mre.window)
+                windows.focus(mre.window)
+                windows.watch_focus(mre.window)
                 xcb.flush(client.connection)
 
             case xcb.UNMAP_NOTIFY:
                 umn := cast(^xcb.UnmapNotifyEvent) event
                 grid.remove(&gr, umn.window)
+
+            case xcb.FOCUS_IN:
+                fci := cast(^xcb.FocusInEvent) event
+                grid.focus_window(&gr, fci.event, screen_size) or_return
+                xcb.flush(client.connection)
         }
     }
 
